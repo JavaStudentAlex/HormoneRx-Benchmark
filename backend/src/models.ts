@@ -102,6 +102,10 @@ export const EventType = {
   EXTRACTION_FAILED: 'EXTRACTION_FAILED',
   TRANSCRIPTION_FAILED: 'TRANSCRIPTION_FAILED',
   SESSION_RESET: 'SESSION_RESET',
+  // Sound-agent events (advisory; never enter the deterministic warning path).
+  SOUND_MENTIONS_EXTRACTED: 'SOUND_MENTIONS_EXTRACTED',
+  AFFECT_SEGMENT_RECEIVED: 'AFFECT_SEGMENT_RECEIVED',
+  RELATIONAL_SIGNAL_RECEIVED: 'RELATIONAL_SIGNAL_RECEIVED',
 } as const;
 export type EventType = (typeof EventType)[keyof typeof EventType];
 
@@ -376,4 +380,65 @@ export function activeAssertions(snapshot: EncounterSnapshot): GraphAssertion[] 
 
 export function activeWarnings(snapshot: EncounterSnapshot): WarningRecord[] {
   return snapshot.warnings.filter((w) => w.state === 'active' || w.state === 'updated');
+}
+
+// ---------------------------------------------------------------------------
+// Sound-agent output (advisory context — NEVER a medical claim, NEVER a warning
+// trigger). eGeMAPS-style acoustic features are measurement; emotion/distress
+// are heuristic flags carrying confidence + provenance for HUMAN review only.
+// ---------------------------------------------------------------------------
+
+/** eGeMAPS-style acoustic features; null fields when no audio was analyzed. */
+export interface AcousticFeatures {
+  f0_mean_hz: number | null;
+  f0_std_hz: number | null;
+  jitter: number | null;
+  shimmer: number | null;
+  hnr_db: number | null;
+  loudness: number | null;
+  speaking_rate_wps: number | null;
+  pause_ratio: number | null;
+  voice_breaks: number | null;
+  feature_set: string; // e.g. 'eGeMAPSv02' or 'none-text-only'
+  extractor: string; // e.g. 'opensmile-3.0' or 'text-heuristic/0.1'
+}
+
+export interface CategoricalEmotion {
+  label: string;
+  score: number;
+  model: string;
+  modality: 'text' | 'audio';
+}
+
+export interface DistressFlag {
+  level: 'none' | 'low' | 'elevated';
+  basis: string[];
+  confidence: 'low' | 'medium' | 'high';
+  reliability: string; // fixed candor string; this is not a clinical determination
+}
+
+export interface AffectSegment {
+  segment_id: string;
+  encounter_id: string;
+  source_turn_id: string;
+  speaker: Speaker;
+  transcript: string;
+  acoustic: AcousticFeatures;
+  categorical_emotion: CategoricalEmotion | null;
+  events: string[]; // e.g. 'voice_break', 'cry' (from audio event tags)
+  distress_flag: DistressFlag;
+  advisory: true; // structural marker: this NEVER enters pair eligibility or warnings
+  provenance: { models: string[]; created_at: IsoDateTime };
+}
+
+export interface RelationalSignal {
+  encounter_id: string;
+  clinician_talk_ratio: number | null;
+  patient_turns: number;
+  doctor_turns: number;
+  patient_distress_turns: number;
+  patient_emotion_acknowledged: boolean | null;
+  possible_dismissal: boolean;
+  confidence: 'speculative';
+  reliability: string;
 }

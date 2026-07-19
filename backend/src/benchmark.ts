@@ -20,7 +20,8 @@ import { BACKEND_DIR, getSettings } from './config.ts';
 import { DeterministicExtractor, EXTRACTOR_VERSION } from './deterministicExtractor.ts';
 import { DuplicateEventError, EncounterService } from './encounterService.ts';
 import { EvidenceIndex, pairKey } from './evidenceIndex.ts';
-import { Speaker, activeWarnings, newId } from './models.ts';
+import { type DistressFlag, Speaker, activeWarnings, newId } from './models.ts';
+import { SoundAgent } from './soundAgent.ts';
 import { NO_MATCH_PRIMARY, NO_MATCH_SECONDARY } from './warningEngine.ts';
 
 const REPO_DIR = path.resolve(BACKEND_DIR, '..');
@@ -550,6 +551,155 @@ export function runIndexLayer(): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
+// Sound-agent layer — summarize -> same deterministic warnings + advisory affect
+// ---------------------------------------------------------------------------
+
+interface AudioCase {
+  id: string;
+  referenceTranscript: Array<{ speaker: string; text: string }>;
+  criticalEntities: string[];
+  expectedFinalState: string | string[];
+  expectedEvidenceRecordId: string | null;
+  expectedWarningLifecycle: string[];
+}
+
+export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
+  const manifest = JSON.parse(
+    readFileSync(path.join(BACKEND_DIR, 'data', 'audio_benchmark_manifest.json'), 'utf8'),
+  ) as { cases: AudioCase[] };
+  const agent = new SoundAgent(null); // Layer-1 text-only; no GPU model wired here
+
+  let statePass = 0;
+  let recordPass = 0;
+  let lifecyclePass = 0;
+  let casePass = 0;
+  let affectSegments = 0;
+  let distressFlagged = 0;
+  let unsupported = 0;
+  let advisoryInvariantHeld = true;
+  const emittedEvents: Array<Record<string, unknown>> = [];
+  const caseResults: Array<Record<string, unknown>> = [];
+
+  for (const testCase of manifest.cases) {
+    const service = buildService();
+    const runtime = service.createEncounter();
+    const turnsForRelational: Array<{ speaker: Speaker; text: string; distress: DistressFlag }> = [];
+    const caseAffectIds = new Set<string>();
+    let sawCreated = false;
+    let sawRetracted = false;
+    let sequence = 0;
+
+    for (const turn of testCase.referenceTranscript) {
+      const snapshot = await service.processFinalTurn(runtime, {
+        event_id: newId('evt'),
+        text: turn.text,
+        speaker: turn.speaker as Speaker,
+        sequence: sequence++,
+      });
+      const lastTurnId = snapshot.turns[snapshot.turns.length - 1]?.turn_id ?? newId('turn');
+      // Sound agent emits its advisory affect segment for this finalized turn.
+      const affect = await agent.affectFor(runtime.snapshot.encounter_id, {
+        turn_id: lastTurnId,
+        speaker: turn.speaker as Speaker,
+        text: turn.text,
+      });
+      affectSegments++;
+      caseAffectIds.add(affect.segment_id);
+      if (affect.distress_flag.level !== 'none') distressFlagged++;
+      turnsForRelational.push({ speaker: turn.speaker as Speaker, text: turn.text, distress: affect.distress_flag });
+      emittedEvents.push({
+        case: testCase.id,
+        event_type: 'AFFECT_SEGMENT_RECEIVED',
+        segment_id: affect.segment_id,
+        speaker: affect.speaker,
+        distress_level: affect.distress_flag.level,
+        distress_basis: affect.distress_flag.basis,
+        advisory: affect.advisory,
+      });
+
+      if (activeWarnings(snapshot).length) sawCreated = true;
+      if (snapshot.warnings.some((w) => w.state === 'retracted')) sawRetracted = true;
+      for (const message of snapshot.messages) {
+        if (!ALLOWED_MESSAGES.has(message)) unsupported++;
+      }
+      // Advisory invariant: no warning may reference an affect segment id, and
+      // every non-retracted warning must trace to a real evidence record.
+      for (const w of snapshot.warnings) {
+        const fields = JSON.stringify(w);
+        for (const id of caseAffectIds) if (fields.includes(id)) advisoryInvariantHeld = false;
+        if (w.state !== 'retracted' && !service.index.getRecord(w.evidence_record_id)) {
+          advisoryInvariantHeld = false;
+        }
+      }
+    }
+
+    const relational = agent.relationalSignal(
+      runtime.snapshot.encounter_id,
+      turnsForRelational.map((t) => ({ speaker: t.speaker, text: t.text, distress: t.distress })),
+    );
+    emittedEvents.push({
+      case: testCase.id,
+      event_type: 'RELATIONAL_SIGNAL_RECEIVED',
+      clinician_talk_ratio: relational.clinician_talk_ratio,
+      possible_dismissal: relational.possible_dismissal,
+      confidence: relational.confidence,
+    });
+
+    const finalSnapshot = runtime.snapshot;
+    const active = activeWarnings(finalSnapshot);
+    const actualRecord =
+      active.length === 1
+        ? active[0].evidence_record_id
+        : active.length === 0
+          ? null
+          : [...active.map((w) => w.evidence_record_id)].sort().join(',');
+    const expectedStates = Array.isArray(testCase.expectedFinalState)
+      ? testCase.expectedFinalState
+      : [testCase.expectedFinalState];
+    const stateOk = expectedStates.includes(finalSnapshot.result_state);
+    const recordOk = actualRecord === testCase.expectedEvidenceRecordId;
+    const expectCreated = testCase.expectedWarningLifecycle.includes('created');
+    const expectRetracted = testCase.expectedWarningLifecycle.includes('retracted');
+    const lifecycleOk = sawCreated === expectCreated && sawRetracted === expectRetracted;
+
+    if (stateOk) statePass++;
+    if (recordOk) recordPass++;
+    if (lifecycleOk) lifecyclePass++;
+    if (stateOk && recordOk && lifecycleOk) casePass++;
+
+    caseResults.push({
+      id: testCase.id,
+      expectedFinalState: testCase.expectedFinalState,
+      actualResultState: finalSnapshot.result_state,
+      expectedEvidenceRecordId: testCase.expectedEvidenceRecordId,
+      actualEvidenceRecordId: actualRecord,
+      lifecycleOk,
+      pass: stateOk && recordOk && lifecycleOk,
+    });
+  }
+
+  const n = manifest.cases.length;
+  return {
+    layer: 'E-soundagent',
+    caseCount: n,
+    metrics: {
+      casePassRate: round4(safeDiv(casePass, n)),
+      finalStateAccuracy: round4(safeDiv(statePass, n)),
+      recordAccuracy: round4(safeDiv(recordPass, n)),
+      warningLifecycleAccuracy: round4(safeDiv(lifecyclePass, n)),
+      affectSegmentsProduced: affectSegments,
+      distressFlaggedSegments: distressFlagged,
+      affectAdvisoryInvariantHeld: advisoryInvariantHeld,
+      unsupportedClaimCount: unsupported,
+    },
+    note:
+      'Sound-agent summary of the Layer-C reference transcripts drives the SAME deterministic pipeline as live extraction (summarize -> insert -> same warnings). Affect segments are advisory only and never trigger a warning. Layer-1 text-only affect; no GPU SER model or audio in this run.',
+    emittedEventsSample: emittedEvents,
+    cases: caseResults,
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 export async function main(layers: string[]): Promise<void> {
   const service = buildService();
@@ -580,6 +730,9 @@ export async function main(layers: string[]): Promise<void> {
   }
   if (layers.includes('index')) {
     output.layers.index = runIndexLayer();
+  }
+  if (layers.includes('soundagent')) {
+    output.layers.soundagent = await runSoundAgentLayer();
   }
 
   const resultsPath = path.join(BACKEND_DIR, 'data', 'benchmark_results.json');
@@ -618,7 +771,7 @@ if (isMain) {
   }
   let selected = layerArgs.length ? layerArgs : ['all'];
   if (selected.includes('all')) {
-    selected = ['text', 'streaming', 'audio', 'index'];
+    selected = ['text', 'streaming', 'audio', 'index', 'soundagent'];
   }
   main(selected).catch((err) => {
     console.error(err);
