@@ -749,27 +749,32 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
       for (const seg of serInputs) {
         const speaker = speakerBySeg.get(seg.segment_id) ?? Speaker.PATIENT;
         const outPath = path.join(audioDir, `${seg.segment_id}.wav`);
-        const tts =
-          ttsProvider === 'openai'
-            ? await synthOpenAiTts({
-                apiKey: openaiKey as string,
-                baseUrl: settings.openai_base_url,
-                voice: speaker === Speaker.DOCTOR ? 'onyx' : 'nova',
-                text: seg.transcript,
-                outPath,
-              })
-            : await synthElevenLabsTts({
-                apiKey: elevenKey as string,
-                voiceId: process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM',
-                text: seg.transcript,
-                outPath,
-              });
+        const viaOpenAi = () =>
+          synthOpenAiTts({
+            apiKey: openaiKey as string,
+            baseUrl: settings.openai_base_url,
+            voice: speaker === Speaker.DOCTOR ? 'onyx' : 'nova',
+            text: seg.transcript,
+            outPath,
+          });
+        const viaEleven = () =>
+          synthElevenLabsTts({
+            apiKey: elevenKey as string,
+            voiceId: process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM',
+            text: seg.transcript,
+            outPath,
+          });
+        let tts = ttsProvider === 'openai' ? await viaOpenAi() : await viaEleven();
+        // Fall back to the other provider if the preferred TTS is gated/unavailable.
+        if (!tts.ok && ttsProvider === 'openai' && elevenKey) tts = await viaEleven();
+        else if (!tts.ok && ttsProvider === 'elevenlabs' && openaiKey) tts = await viaOpenAi();
         ttsCalls++;
         if (!tts.ok) {
           affectErrors.push(`tts ${seg.segment_id}: ${tts.error}`);
           continue;
         }
         ttsOk++;
+        if (tts.provider !== `${ttsProvider}-tts`) ttsProviderUsed = `${ttsProvider}->${tts.provider}`;
         const t0 = Date.now();
         try {
           const out = await affectModel.infer({ transcript: seg.transcript, audioPath: outPath });

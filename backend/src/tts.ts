@@ -47,7 +47,7 @@ export async function synthOpenAiTts(o: {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${o.apiKey}` },
       body: JSON.stringify({
-        model: o.model ?? process.env.OPENAI_TTS_MODEL ?? 'gpt-4o-mini-tts',
+        model: o.model ?? process.env.OPENAI_TTS_MODEL ?? 'tts-1',
         voice: o.voice,
         input: o.text,
         response_format: 'wav',
