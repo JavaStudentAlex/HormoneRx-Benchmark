@@ -42,7 +42,14 @@ services:
         value: "false"
       - key: LOG_LEVEL
         value: INFO
-      # Live mic transcription + model extraction. Set in the Render dashboard
-      # (Environment tab) — never commit. Scripted demo works without it.
+      # ---- Secrets — values are NOT stored here. `sync: false` means Render
+      # prompts for them at blueprint deploy (or set them in the service's
+      # Environment tab). Never commit real keys to this file.
+      # Live mic transcription + model extraction + OpenAI TTS. Scripted demo
+      # works without it.
       - key: OPENAI_API_KEY
+        sync: false
+      # Optional: only needed for the elevenlabs-tts voice provider
+      # (backend/src/tts.ts). Everything else works without it.
+      - key: ELEVENLABS_API_KEY
         sync: false
