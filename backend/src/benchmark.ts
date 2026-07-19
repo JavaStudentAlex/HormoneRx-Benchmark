@@ -25,6 +25,7 @@ import { SoundAgent } from './soundAgent.ts';
 import {
   ElevenLabsAffectModel,
   OpenAiAudioAffectModel,
+  OpenAiTextAffectModel,
   type SerResponse,
   type SerSegmentInput,
   runSidecarSer,
@@ -714,6 +715,7 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
   let affectOk = 0;
   let serDevice: string | null = null;
   let ttsProviderUsed: string | null = null;
+  const affectModelsUsed = new Set<string>();
 
   if (affectProvider === 'sidecar') {
     // Local GPU path — deprioritized; runs only when AFFECT_BACKEND=sidecar.
@@ -742,10 +744,32 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
     } else {
       const audioDir = path.join(BACKEND_DIR, 'data', 'tts_tmp');
       mkdirSync(audioDir, { recursive: true });
-      const affectModel =
-        affectProvider === 'openai'
-          ? new OpenAiAudioAffectModel({ apiKey: openaiKey as string, baseUrl: settings.openai_base_url })
-          : new ElevenLabsAffectModel({ apiKey: elevenKey as string });
+      // Prioritized affect chain — cloud-first, resilient to per-project model gating.
+      type Attempt = {
+        model: string;
+        run: (audioPath: string, transcript: string) => Promise<{ categorical_emotion?: { label: string }; events?: string[] }>;
+      };
+      const openAiAudio: Attempt = {
+        model: 'openai:gpt-4o-audio-preview',
+        run: (ap, tr) => new OpenAiAudioAffectModel({ apiKey: openaiKey as string, baseUrl: settings.openai_base_url }).infer({ transcript: tr, audioPath: ap }),
+      };
+      const elevenScribe: Attempt = {
+        model: 'elevenlabs:scribe_v2',
+        run: (ap, tr) => new ElevenLabsAffectModel({ apiKey: elevenKey as string }).infer({ transcript: tr, audioPath: ap }),
+      };
+      const openAiText: Attempt = {
+        model: 'openai:gpt-4o-mini(text)',
+        run: (_ap, tr) => new OpenAiTextAffectModel({ apiKey: openaiKey as string, baseUrl: settings.openai_base_url }).infer({ transcript: tr }),
+      };
+      const chain: Attempt[] = [];
+      if (affectProvider === 'openai') {
+        if (openaiKey) chain.push(openAiAudio);
+        if (elevenKey) chain.push(elevenScribe);
+        if (openaiKey) chain.push(openAiText);
+      } else {
+        if (elevenKey) chain.push(elevenScribe);
+        if (openaiKey) chain.push(openAiAudio, openAiText);
+      }
       for (const seg of serInputs) {
         const speaker = speakerBySeg.get(seg.segment_id) ?? Speaker.PATIENT;
         const outPath = path.join(audioDir, `${seg.segment_id}.wav`);
@@ -775,24 +799,30 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
         }
         ttsOk++;
         if (tts.provider !== `${ttsProvider}-tts`) ttsProviderUsed = `${ttsProvider}->${tts.provider}`;
+        affectCalls++;
         const t0 = Date.now();
-        try {
-          const out = await affectModel.infer({ transcript: seg.transcript, audioPath: outPath });
-          affectCalls++;
-          affectOk++;
-          affectLatencies.push(Date.now() - t0);
-          if (affectSampleResults.length < 6) {
-            affectSampleResults.push({
-              segment_id: seg.segment_id,
-              provider: affectProvider,
-              emotion: out.categorical_emotion?.label ?? null,
-              events: out.events ?? [],
-            });
+        let done = false;
+        for (const attempt of chain) {
+          try {
+            const out = await attempt.run(outPath, seg.transcript);
+            affectOk++;
+            affectLatencies.push(Date.now() - t0);
+            affectModelsUsed.add(attempt.model);
+            if (affectSampleResults.length < 6) {
+              affectSampleResults.push({
+                segment_id: seg.segment_id,
+                model: attempt.model,
+                emotion: out.categorical_emotion?.label ?? null,
+                events: out.events ?? [],
+              });
+            }
+            done = true;
+            break;
+          } catch (e) {
+            affectErrors.push(`affect ${seg.segment_id} via ${attempt.model}: ${String(e).slice(0, 120)}`);
           }
-        } catch (e) {
-          affectCalls++;
-          affectErrors.push(`affect ${seg.segment_id}: ${String(e).slice(0, 160)}`);
         }
+        void done;
       }
     }
   }
@@ -825,6 +855,7 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
       ttsOk,
       affectCalls,
       affectOk,
+      affectModelsUsed: [...affectModelsUsed],
       affectMeanLatencyMs,
       affectErrorCount: affectErrors.length,
       serDevice,

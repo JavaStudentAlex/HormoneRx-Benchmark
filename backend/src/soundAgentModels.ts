@@ -152,6 +152,55 @@ export class OpenAiAudioAffectModel implements AffectModel {
   }
 }
 
+/**
+ * OpenAI TEXT affect over the transcript (gpt-4o-mini). Accessible fallback when
+ * the project lacks audio-model access — misses prosody, catches lexical affect.
+ */
+export class OpenAiTextAffectModel implements AffectModel {
+  name: string;
+  private apiKey: string;
+  private baseUrl: string;
+  private model: string;
+
+  constructor(opts: { apiKey: string; baseUrl?: string; model?: string }) {
+    this.apiKey = opts.apiKey;
+    this.baseUrl = opts.baseUrl ?? 'https://api.openai.com/v1';
+    this.model = opts.model ?? process.env.OPENAI_AFFECT_TEXT_MODEL ?? 'gpt-4o-mini';
+    this.name = `openai:${this.model}(text)`;
+  }
+
+  async infer(input: { transcript: string; audioPath?: string; acoustic?: AcousticFeatures }): Promise<{
+    categorical_emotion?: CategoricalEmotion;
+    events?: string[];
+  }> {
+    if (!this.apiKey) throw new Error('OpenAiTextAffectModel requires OPENAI_API_KEY');
+    const resp = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${this.apiKey}` },
+      body: JSON.stringify({
+        model: this.model,
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: AFFECT_SYSTEM_PROMPT },
+          { role: 'user', content: `Transcript: "${input.transcript}"` },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error(`openai text affect ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
+    const data = (await resp.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}') as {
+      emotion?: string;
+      distress_level?: string;
+    };
+    return {
+      categorical_emotion: parsed.emotion
+        ? { label: parsed.emotion, score: parsed.distress_level === 'elevated' ? 0.7 : 0.4, model: this.name, modality: 'text' }
+        : undefined,
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // ElevenLabs Scribe v2 — STT with audio-event / emotion tags
 // ---------------------------------------------------------------------------
