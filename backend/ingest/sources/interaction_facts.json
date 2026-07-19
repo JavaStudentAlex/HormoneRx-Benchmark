@@ -1,0 +1,198 @@
+{
+  "sourceSetVersion": "0.1.0",
+  "note": "License-tagged seed interaction facts for the offline ingestion pipeline. Each fact is source-linked and physicianVerified:false (pending sign-off), and expresses the SAME well-established, source-cited class effect already carried by INT-003/004/006 (hepatic enzyme-inducing drugs can reduce contraceptive effectiveness). No new clinical claim is invented; coverage is extended across the contraceptive x enzyme-inducer matrix using closed-class membership. Prose is a non-directive paraphrase of the cited public-domain source. Concept ids reference the existing approved synonym_index ontology; no ontology change.",
+  "licenseTags": {
+    "public_domain": "US Government / regulator public-domain guidance (CDC US-MEC, FDA labels, MHRA DSU). Commercial-safe.",
+    "curated_prototype": "Hand-curated, FSRH-informed prototype record (FSRH tables are copyrighted; content re-expressed, not redistributed).",
+    "research_nc": "Reserved for CC BY-NC sources (DDInter2, TWOSIDES) — never emitted into a commercial build."
+  },
+  "facts": [
+    {
+      "id": "INT-101",
+      "hormonalProduct": "Combined hormonal contraceptive",
+      "hormonalSynonyms": [
+        "combined oral contraceptive",
+        "combined pill",
+        "COC",
+        "CHC",
+        "ethinylestradiol-containing contraceptive",
+        "combined contraceptive patch",
+        "combined vaginal ring"
+      ],
+      "interactingMedication": "Additional hepatic enzyme-inducing medications",
+      "medicationSynonyms": [
+        "phenytoin",
+        "phenobarbital",
+        "primidone",
+        "efavirenz",
+        "St John's wort",
+        "griseofulvin",
+        "enzyme inducer",
+        "enzyme-inducing drug"
+      ],
+      "interactionDirection": "Interacting medication may reduce exposure to the contraceptive hormone",
+      "potentialConsequence": "These agents are hepatic enzyme-inducing drugs. Enzyme induction increases clearance of contraceptive hormones and could reduce the contraceptive effectiveness of combined hormonal contraception. The US Medical Eligibility Criteria classify combined hormonal contraceptives as category 3 during use of these anticonvulsant and other enzyme-inducing therapies.",
+      "clinicianConsideration": "Evidence to review in the individual clinical context.",
+      "evidenceLevel": "Clinical guideline (US Medical Eligibility Criteria)",
+      "population": "People using or considering combined hormonal contraception who take a hepatic enzyme-inducing drug",
+      "sourceTitle": "U.S. Medical Eligibility Criteria for Contraceptive Use, 2024 — Summary of Classifications",
+      "sourceOrganization": "U.S. Centers for Disease Control and Prevention (CDC)",
+      "sourceUrl": "https://www.cdc.gov/contraception/hcp/usspr/classifications-mec-contraception.html",
+      "sourceSection": "Summary of Classifications — Anticonvulsant therapy (phenytoin, phenobarbital, primidone) and Antiretroviral therapy (efavirenz); CHC = category 3",
+      "jurisdiction": "United States",
+      "lastVerified": "2026-07-19",
+      "physicianVerified": false,
+      "limitations": "Interacting agents are treated as representative hepatic enzyme inducers via closed-class membership. The magnitude of any reduction in contraceptive effectiveness for an individual is not established. Prototype dataset entry; requires verification against the cited source and individual clinical context.",
+      "matchType": "closed_class",
+      "hormonalConceptIds": [
+        "combined_hormonal_contraceptive",
+        "estrogen_containing_oral_contraceptive"
+      ],
+      "interactingConceptIds": [
+        "phenytoin",
+        "phenobarbital",
+        "primidone",
+        "efavirenz",
+        "st_johns_wort",
+        "griseofulvin"
+      ],
+      "interactionDirectionCode": "MEDICATION_AFFECTS_CONTRACEPTIVE",
+      "severityOrdinal": 3,
+      "licenseTag": "public_domain",
+      "machineMatchingNotes": "Closed-class membership is exactly the single agents enumerated here. Extends CHC coverage beyond the carbamazepine/rifampicin/rifabutin records (INT-001/002). Class words never match by themselves."
+    },
+    {
+      "id": "INT-102",
+      "hormonalProduct": "Progestogen-only pill",
+      "hormonalSynonyms": [
+        "POP",
+        "progestogen only pill",
+        "progesterone only pill",
+        "mini pill",
+        "desogestrel pill",
+        "drospirenone-only pill"
+      ],
+      "interactingMedication": "Additional hepatic enzyme-inducing medications",
+      "medicationSynonyms": [
+        "efavirenz",
+        "St John's wort",
+        "griseofulvin",
+        "enzyme inducer",
+        "enzyme-inducing drug"
+      ],
+      "interactionDirection": "Interacting medication may reduce exposure to the contraceptive hormone",
+      "potentialConsequence": "These agents are hepatic enzyme-inducing drugs. Enzyme induction could reduce the contraceptive effectiveness of progestogen-only pills. The US Medical Eligibility Criteria classify progestogen-only pills as category 3 during use of these enzyme-inducing therapies.",
+      "clinicianConsideration": "Evidence to review in the individual clinical context.",
+      "evidenceLevel": "Clinical guideline (US Medical Eligibility Criteria)",
+      "population": "People using or considering a progestogen-only pill who take a hepatic enzyme-inducing drug",
+      "sourceTitle": "U.S. Medical Eligibility Criteria for Contraceptive Use, 2024 — Summary of Classifications",
+      "sourceOrganization": "U.S. Centers for Disease Control and Prevention (CDC)",
+      "sourceUrl": "https://www.cdc.gov/contraception/hcp/usspr/classifications-mec-contraception.html",
+      "sourceSection": "Summary of Classifications — Antiretroviral therapy (efavirenz) and other enzyme-inducing drugs; POP row",
+      "jurisdiction": "United States",
+      "lastVerified": "2026-07-19",
+      "physicianVerified": false,
+      "limitations": "Extends INT-003 (which already enumerates carbamazepine, phenytoin, phenobarbital, primidone, rifampicin, rifabutin) with efavirenz, St John's wort, griseofulvin. Prototype dataset entry; requires verification against the cited source and individual clinical context.",
+      "matchType": "closed_class",
+      "hormonalConceptIds": [
+        "progestogen_only_pill"
+      ],
+      "interactingConceptIds": [
+        "efavirenz",
+        "st_johns_wort",
+        "griseofulvin"
+      ],
+      "interactionDirectionCode": "MEDICATION_AFFECTS_CONTRACEPTIVE",
+      "severityOrdinal": 3,
+      "licenseTag": "public_domain",
+      "machineMatchingNotes": "Closed-class membership adds the enzyme inducers not enumerated by INT-003."
+    },
+    {
+      "id": "INT-103",
+      "hormonalProduct": "Etonogestrel implant",
+      "hormonalSynonyms": [
+        "contraceptive implant",
+        "the implant",
+        "Nexplanon",
+        "Implanon",
+        "ENG-IMP",
+        "subdermal implant"
+      ],
+      "interactingMedication": "Additional hepatic enzyme-inducing medications",
+      "medicationSynonyms": [
+        "efavirenz",
+        "St John's wort",
+        "griseofulvin",
+        "enzyme inducer",
+        "enzyme-inducing drug"
+      ],
+      "interactionDirection": "Interacting medication may reduce exposure to the contraceptive hormone",
+      "potentialConsequence": "These agents are hepatic enzyme-inducing drugs. Enzyme induction could reduce the contraceptive effectiveness of the etonogestrel implant. The US Medical Eligibility Criteria classify the etonogestrel implant as category 2 during use of enzyme-inducing therapies, with an alternative effective method recommended when reduced effectiveness is a concern.",
+      "clinicianConsideration": "Evidence to review in the individual clinical context.",
+      "evidenceLevel": "Clinical guideline (US Medical Eligibility Criteria)",
+      "population": "People using or considering the etonogestrel implant who take a hepatic enzyme-inducing drug",
+      "sourceTitle": "U.S. Medical Eligibility Criteria for Contraceptive Use, 2024 — Summary of Classifications",
+      "sourceOrganization": "U.S. Centers for Disease Control and Prevention (CDC)",
+      "sourceUrl": "https://www.cdc.gov/contraception/hcp/usspr/classifications-mec-contraception.html",
+      "sourceSection": "Summary of Classifications — Anticonvulsant / Antiretroviral therapy; Implant row",
+      "jurisdiction": "United States",
+      "lastVerified": "2026-07-19",
+      "physicianVerified": false,
+      "limitations": "Extends INT-004 with efavirenz, St John's wort, griseofulvin. US-MEC implant categorization differs from CHC/POP and is recorded here as severityOrdinal 2. Prototype dataset entry; requires verification against the cited source and individual clinical context.",
+      "matchType": "closed_class",
+      "hormonalConceptIds": [
+        "etonogestrel_implant"
+      ],
+      "interactingConceptIds": [
+        "efavirenz",
+        "st_johns_wort",
+        "griseofulvin"
+      ],
+      "interactionDirectionCode": "MEDICATION_AFFECTS_CONTRACEPTIVE",
+      "severityOrdinal": 2,
+      "licenseTag": "public_domain",
+      "machineMatchingNotes": "Closed-class membership adds the enzyme inducers not enumerated by INT-004."
+    },
+    {
+      "id": "INT-104",
+      "hormonalProduct": "Levonorgestrel emergency contraception",
+      "hormonalSynonyms": [
+        "levonorgestrel EC",
+        "LNG-EC",
+        "emergency contraceptive pill",
+        "morning-after pill",
+        "Levonelle",
+        "Plan B"
+      ],
+      "interactingMedication": "Phenobarbital (hepatic enzyme inducer)",
+      "medicationSynonyms": [
+        "phenobarbital",
+        "phenobarbitone"
+      ],
+      "interactionDirection": "Interacting medication may reduce exposure to the contraceptive hormone",
+      "potentialConsequence": "Phenobarbital is a hepatic enzyme inducer. Enzyme induction increases the metabolism of levonorgestrel and reduces its plasma levels, which may reduce the contraceptive efficacy of levonorgestrel-containing emergency contraception. Elevated enzyme levels can persist for up to 4 weeks after the enzyme-inducing medicine is stopped.",
+      "clinicianConsideration": "Evidence to review in the individual clinical context.",
+      "evidenceLevel": "Regulatory safety communication (Drug Safety Update)",
+      "population": "People seeking levonorgestrel emergency contraception who have used phenobarbital within the last 4 weeks",
+      "sourceTitle": "Drug Safety Update: Levonorgestrel-containing emergency hormonal contraception (September 2016)",
+      "sourceOrganization": "Medicines and Healthcare products Regulatory Agency (MHRA)",
+      "sourceUrl": "https://www.gov.uk/drug-safety-update/levonorgestrel-containing-emergency-hormonal-contraception-advice-on-interactions-with-hepatic-enzyme-inducers-and-contraceptive-efficacy",
+      "sourceSection": "'Examples of enzyme inducers that reduce plasma levonorgestrel levels' — barbiturates class member phenobarbital",
+      "jurisdiction": "United Kingdom",
+      "lastVerified": "2026-07-19",
+      "physicianVerified": false,
+      "limitations": "Enumerates phenobarbital, the barbiturate deliberately left unexpanded in INT-006 (whose list names the class word 'barbiturates' but not the member). Prototype dataset entry; requires verification against the cited source and individual clinical context.",
+      "matchType": "closed_class",
+      "hormonalConceptIds": [
+        "levonorgestrel_emergency_contraception"
+      ],
+      "interactingConceptIds": [
+        "phenobarbital"
+      ],
+      "interactionDirectionCode": "MEDICATION_AFFECTS_CONTRACEPTIVE",
+      "severityOrdinal": 3,
+      "licenseTag": "public_domain",
+      "machineMatchingNotes": "Enumerates the specific barbiturate member (phenobarbital) that INT-006 left as an unexpanded class word."
+    }
+  ]
+}

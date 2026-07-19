@@ -15,10 +15,11 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { writeGeneratedArtifacts } from '../ingest/build_index.ts';
 import { BACKEND_DIR, getSettings } from './config.ts';
 import { DeterministicExtractor, EXTRACTOR_VERSION } from './deterministicExtractor.ts';
 import { DuplicateEventError, EncounterService } from './encounterService.ts';
-import { EvidenceIndex } from './evidenceIndex.ts';
+import { EvidenceIndex, pairKey } from './evidenceIndex.ts';
 import { Speaker, activeWarnings, newId } from './models.ts';
 import { NO_MATCH_PRIMARY, NO_MATCH_SECONDARY } from './warningEngine.ts';
 
@@ -409,6 +410,146 @@ export function runAudioLayer(): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
+// Index layer — offline-build scale + runtime lookup latency (this experiment)
+// ---------------------------------------------------------------------------
+
+/** Deterministic LCG so the microbenchmark's query mix is reproducible. */
+function lcg(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
+function percentile(sortedNs: number[], q: number): number {
+  if (!sortedNs.length) return 0;
+  return sortedNs[Math.min(sortedNs.length - 1, Math.floor(q * (sortedNs.length - 1)))];
+}
+
+/**
+ * Time `iterations` lookups against a Map, querying an even mix of present keys
+ * (round-robin) and absent keys (misses). Returns nanosecond stats and throughput.
+ */
+function timeLookups(
+  map: Map<string, string[]>,
+  keys: string[],
+  iterations: number,
+  sampleForPercentiles = 50_000,
+): Record<string, number> {
+  const rand = lcg(0x9e3779b9);
+  const missKeys = keys.map((_, i) => `absent_h${i} absent_m${i}`);
+  // Warm up.
+  for (let i = 0; i < Math.min(10_000, iterations); i++) map.get(keys[i % keys.length]);
+
+  const start = process.hrtime.bigint();
+  let sink = 0;
+  for (let i = 0; i < iterations; i++) {
+    const useHit = rand() < 0.7;
+    const k = useHit ? keys[i % keys.length] : missKeys[i % missKeys.length];
+    const v = map.get(k);
+    sink += v ? 1 : 0;
+  }
+  const totalNs = Number(process.hrtime.bigint() - start);
+  void sink;
+
+  // Per-call samples for percentiles (higher variance; indicative only).
+  const samples: number[] = [];
+  const n = Math.min(sampleForPercentiles, iterations);
+  for (let i = 0; i < n; i++) {
+    const k = i % 2 === 0 ? keys[i % keys.length] : missKeys[i % missKeys.length];
+    const t0 = process.hrtime.bigint();
+    map.get(k);
+    samples.push(Number(process.hrtime.bigint() - t0));
+  }
+  samples.sort((a, b) => a - b);
+
+  return {
+    iterations,
+    avgNsPerLookup: round4(totalNs / iterations),
+    throughputPerSec: Math.round(iterations / (totalNs / 1e9)),
+    p50Ns: percentile(samples, 0.5),
+    p90Ns: percentile(samples, 0.9),
+    p99Ns: percentile(samples, 0.99),
+    maxNs: percentile(samples, 1),
+  };
+}
+
+/** Build a synthetic pair index of `size` entries for the flat-latency stress test. */
+function syntheticIndex(size: number): { map: Map<string, string[]>; keys: string[] } {
+  const map = new Map<string, string[]>();
+  const keys: string[] = [];
+  for (let i = 0; i < size; i++) {
+    const k = pairKey(`h_${i}`, `m_${i}`);
+    keys.push(k);
+    map.set(k, [`SYN-${i}`]);
+  }
+  return { map, keys };
+}
+
+export function runIndexLayer(): Record<string, unknown> {
+  const settings = getSettings();
+
+  // Frozen control index (6-record curated tier).
+  const baseIndex = new EvidenceIndex(settings.evidence_path, settings.synonym_path, {
+    strict: true,
+    allowPendingVerification: settings.evidence_allow_pending_verification,
+  });
+
+  // Offline build → expanded, license-tagged index.
+  const { manifest, problems } = writeGeneratedArtifacts();
+  const genDir = path.join(BACKEND_DIR, 'data', 'generated');
+  const expandedIndex = new EvidenceIndex(
+    path.join(genDir, 'evidence_records.json'),
+    path.join(genDir, 'synonym_index.json'),
+    { strict: true, allowPendingVerification: true },
+  );
+
+  // Superset non-regression: every runtime pair the control resolved must persist.
+  const basePairs = [...baseIndex.pair_index.keys()];
+  const expandedKeys = new Set(expandedIndex.pair_index.keys());
+  const missingFromExpanded = basePairs.filter((k) => !expandedKeys.has(k));
+
+  // Microbenchmark on the real expanded index.
+  const realKeys = [...expandedIndex.pair_index.keys()];
+  const realLatency = timeLookups(expandedIndex.pair_index, realKeys, 1_000_000);
+
+  // Synthetic stress test — prove lookup stays flat (O(1)) as the store grows.
+  const stress: Record<string, unknown> = {};
+  for (const size of [1_000, 10_000, 100_000]) {
+    const { map, keys } = syntheticIndex(size);
+    stress[String(size)] = timeLookups(map, keys, 1_000_000);
+  }
+
+  return {
+    layer: 'D-index',
+    metrics: {
+      baseRecordCount: Object.keys(baseIndex.records).length,
+      expandedRecordCount: manifest.recordCount,
+      generatedRecordCount: manifest.generatedRecordCount,
+      basePairCount: baseIndex.pair_index.size,
+      expandedPairCount: expandedIndex.pair_index.size,
+      pairGrowthFactor: round4(safeDiv(expandedIndex.pair_index.size, baseIndex.pair_index.size)),
+      commercialSafeRecords: manifest.commercialSafeRecords,
+      supersetOk: missingFromExpanded.length === 0,
+      realAvgNsPerLookup: realLatency.avgNsPerLookup,
+      realThroughputPerSec: realLatency.throughputPerSec,
+      stress100kAvgNsPerLookup: (stress['100000'] as Record<string, number>).avgNsPerLookup,
+      buildProblemCount: problems.length,
+    },
+    build: manifest,
+    realIndexLatency: realLatency,
+    syntheticStressLatency: stress,
+    supersetCheck: {
+      controlPairCount: basePairs.length,
+      missingFromExpanded,
+      ok: missingFromExpanded.length === 0,
+    },
+    problems,
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 export async function main(layers: string[]): Promise<void> {
   const service = buildService();
@@ -437,6 +578,9 @@ export async function main(layers: string[]): Promise<void> {
   if (layers.includes('audio')) {
     output.layers.audio = runAudioLayer();
   }
+  if (layers.includes('index')) {
+    output.layers.index = runIndexLayer();
+  }
 
   const resultsPath = path.join(BACKEND_DIR, 'data', 'benchmark_results.json');
   writeFileSync(resultsPath, JSON.stringify(output, null, 2) + '\n');
@@ -449,7 +593,11 @@ export async function main(layers: string[]): Promise<void> {
       console.log(`[${name}] SKIPPED: ${layer.reason}`);
       continue;
     }
-    console.log(`[${name}] cases=${layer.caseCount} metrics=${JSON.stringify(layer.metrics)}`);
+    const casePrefix = layer.caseCount !== undefined ? `cases=${layer.caseCount} ` : '';
+    console.log(`[${name}] ${casePrefix}metrics=${JSON.stringify(layer.metrics)}`);
+    if (layer.processingLatency) {
+      console.log(`[${name}] processingLatency=${JSON.stringify(layer.processingLatency)}`);
+    }
     const failing = (layer.cases ?? []).filter((c: any) => !(c.pass ?? true)).map((c: any) => c.id);
     if (failing.length) {
       console.log(`[${name}] FAILING: ${JSON.stringify(failing)}`);
@@ -470,7 +618,7 @@ if (isMain) {
   }
   let selected = layerArgs.length ? layerArgs : ['all'];
   if (selected.includes('all')) {
-    selected = ['text', 'streaming', 'audio'];
+    selected = ['text', 'streaming', 'audio', 'index'];
   }
   main(selected).catch((err) => {
     console.error(err);
