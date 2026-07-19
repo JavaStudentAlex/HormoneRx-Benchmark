@@ -43,12 +43,23 @@ The router rejects duplicate `event_id`/`provider_item_id` before any state chan
 event log ordered by turn sequence, so a late-arriving earlier turn is replayed in its
 correct position and any stale warning is retracted (covered by STREAM-009/010).
 
-## Speaker attribution (spec §7.7)
+## Speaker attribution (spec §7.7, extended)
 
-Automatic diarization is not a dependency. The UI has an explicit Doctor / Patient /
-Unknown selector (shortcuts D / P); every finalized turn carries the selected label, and
-the extractor applies deterministic subject rules on top (other-person cues, doctor
-first-person, discussion-only mentions).
+The UI no longer splits doctor/patient input: when a finalized turn arrives without an
+explicit speaker label (single-mic audio, or the unified conversation input), the backend
+attributes the role itself — once, at ingestion, inside the per-encounter lock — and
+persists it into the `TRANSCRIPT_FINAL_RECEIVED` payload with provenance
+(`speaker_source`, model, confidence, `attribution_ms`). Replay never re-runs inference.
+Attribution is a small structured-output model call outside demo mode
+(`SPEAKER_ATTRIBUTION_MODEL`, falling back to the extraction model) and a deterministic
+weighted-cue classifier in demo mode or on any model failure; it abstains to `unknown`
+when no role wins clearly. An explicitly supplied speaker always wins (demo scripts,
+benchmark cases, `speaker.changed` overrides, any wire message carrying the field), so
+gold labels are untouched. Acoustic diarization is still not a dependency — role
+inference is content-based; a realtime-diarization provider remains the upgrade path.
+The extractor applies deterministic subject rules on top (other-person cues, doctor
+first-person, discussion-only mentions), and `SPEAKER_ATTRIBUTION_ENABLED=false`
+restores the legacy active-speaker fallback.
 
 ## Turn finalization (spec §7.6)
 

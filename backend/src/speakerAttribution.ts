@@ -106,14 +106,12 @@ const PATIENT_CUES: readonly WeightedCue[] = [
 
 /** Companion self-identification is rare but decisive when present. */
 const OTHER_PERSON_CUES: readonly WeightedCue[] = [
-  ["i'm her husband", 3],
-  ["i'm his wife", 3],
-  ["i'm her mother", 3],
-  ["i'm his mother", 3],
-  ["i'm her partner", 3],
-  ["i'm his partner", 3],
-  ["i'm their", 3],
-  ["i'm the patient's", 3],
+  ...['her husband', 'his wife', 'her mother', 'his mother', 'her partner', 'his partner', 'their', "the patient's"].flatMap(
+    (who): WeightedCue[] => [
+      [`i'm ${who}`, 3],
+      [`i am ${who}`, 3],
+    ],
+  ),
 ];
 
 function cueScore(lower: string, cues: readonly WeightedCue[]): number {

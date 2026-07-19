@@ -56,6 +56,7 @@ describe('DeterministicSpeakerAttributor', () => {
   it('labels companion self-identification as other_person', async () => {
     const result = await attribute("I'm her husband — she takes her pill every morning.");
     expect(result.speaker).toBe('other_person');
+    expect((await attribute('I am her husband, I just drove her here.')).speaker).toBe('other_person');
   });
 
   it('abstains to unknown on unattributable text', async () => {
@@ -84,7 +85,7 @@ describe('LlmSpeakerAttributor', () => {
   const llmSettings = defaultSettings({ demo_mode: false, openai_api_key: 'sk-test' });
 
   function stubFetch(response: () => Promise<Response>) {
-    const mock = vi.fn(response);
+    const mock = vi.fn((_input: string | URL, _init?: RequestInit) => response());
     vi.stubGlobal('fetch', mock);
     return mock;
   }
