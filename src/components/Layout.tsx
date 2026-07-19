@@ -8,6 +8,7 @@ import { useMode } from '../lib/useMode';
 const nav = [
   { to: '/', label: 'Overview', end: true },
   { to: '/live', label: 'Live Consultation' },
+  { to: '/analyze', label: 'Text Analysis' },
   { to: '/evidence', label: 'Evidence Library' },
   { to: '/benchmark', label: 'Benchmark' },
   { to: '/about', label: 'About' },

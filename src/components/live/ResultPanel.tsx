@@ -4,7 +4,7 @@ import EvidenceRecordView from '../EvidenceRecordView';
 import type { EvidenceRecord } from '../../lib/types';
 import type { BackendAssertion, BackendResult, BackendTurn, BackendWarning } from '../../lib/backendClient';
 
-const stateMeta: Record<string, { label: string; tone: 'teal' | 'amber' | 'muted' | 'danger' | 'navy'; border: string }> = {
+export const stateMeta: Record<string, { label: string; tone: 'teal' | 'amber' | 'muted' | 'danger' | 'navy'; border: string }> = {
   LISTENING: { label: 'Listening', tone: 'muted', border: 'border-line bg-canvas' },
   PROCESSING: { label: 'Processing', tone: 'muted', border: 'border-line bg-canvas' },
   EVIDENCE_FOUND: { label: 'Potentially relevant evidence found', tone: 'amber', border: 'border-amber/40 bg-amber/5' },

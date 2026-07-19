@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, cn } from '../components/ui/primitives';
 import TranscriptPanel from '../components/live/TranscriptPanel';
 import GraphPanel from '../components/live/GraphPanel';
 import ResultPanel from '../components/live/ResultPanel';
+import ReasoningGraphPanel from '../components/live/ReasoningGraphPanel';
 import FleetPanel, { type FleetSummary } from '../components/live/FleetPanel';
-import AnalyzeCase from './AnalyzeCase';
 import { downloadText } from '../lib/exportUtils';
 import { startAudioCapture, type AudioCaptureHandle } from '../lib/audioCapture';
 import {
@@ -22,48 +22,26 @@ import {
   type ServerEvent,
 } from '../lib/backendClient';
 
-type Tab = 'live' | 'text';
 type SessionPhase = 'idle' | 'listening' | 'stopped';
 type MicState = 'not_requested' | 'requesting' | 'active' | 'denied' | 'unavailable';
 
 export default function LiveConsultation() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab: Tab = searchParams.get('tab') === 'text' ? 'text' : 'live';
+  const [searchParams] = useSearchParams();
+  // Old bookmark compatibility: the former text tab is its own page now.
+  if (searchParams.get('tab') === 'text') return <Navigate to="/analyze" replace />;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-navy">Live Consultation</h1>
         <p className="mt-2 max-w-3xl text-sm text-navy-soft">
-          Real-time listener: finalized speech turns are analyzed into a provenance-linked encounter medication graph,
-          checked deterministically against the physician-reviewed evidence dataset, and any warning is retracted
-          visibly when later speech corrects the context.
+          One conversation, analyzed in real time: the backend attributes each finalized turn to the doctor or patient
+          on its own, builds a provenance-linked encounter medication graph, checks it deterministically against the
+          physician-reviewed evidence dataset, and visibly retracts any warning when later speech corrects the context.
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-line" role="tablist" aria-label="Consultation input mode">
-        {(
-          [
-            ['live', 'Live session'],
-            ['text', 'Text analysis (fallback)'],
-          ] as [Tab, string][]
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={tab === key}
-            onClick={() => setSearchParams(key === 'live' ? {} : { tab: key })}
-            className={cn(
-              'rounded-t-lg border border-b-0 px-4 py-2 text-sm font-medium',
-              tab === key ? 'border-line bg-surface text-navy' : 'border-transparent text-ink-muted hover:text-navy',
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'live' ? <LiveSession /> : <AnalyzeCase embedded />}
+      <LiveSession />
     </div>
   );
 }
@@ -75,7 +53,6 @@ function LiveSession() {
   const [phase, setPhase] = useState<SessionPhase>('idle');
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed'>('closed');
   const [micState, setMicState] = useState<MicState>('not_requested');
-  const [speaker, setSpeaker] = useState<'doctor' | 'patient' | 'unknown'>('patient');
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [caption, setCaption] = useState<{ speaker: string; text: string } | null>(null);
@@ -98,8 +75,6 @@ function LiveSession() {
   const encounterIdRef = useRef<string | null>(null);
   const micRef = useRef<AudioCaptureHandle | null>(null);
   const audioWsRef = useRef<WebSocket | null>(null);
-  const speakerRef = useRef(speaker);
-  speakerRef.current = speaker;
 
   useEffect(() => {
     backend
@@ -130,18 +105,6 @@ function LiveSession() {
     const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 500);
     return () => clearInterval(timer);
   }, [startedAt]);
-
-  // Keyboard shortcuts for the speaker selector (spec §7.7).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'd' || e.key === 'D') changeSpeaker('doctor');
-      if (e.key === 'p' || e.key === 'P') changeSpeaker('patient');
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const applyState = useCallback((event: ServerEvent) => {
     if (event.type === 'encounter.snapshot' || event.type === 'graph.updated') {
@@ -225,7 +188,7 @@ function LiveSession() {
       setMicState('active');
     } catch {
       setMicState('denied');
-      setErrorBanner('Microphone unavailable or permission denied. The scripted demo and text fallback below still work.');
+      setErrorBanner('Microphone unavailable or permission denied. The scripted demo and manual turn input still work.');
     }
   }
 
@@ -255,11 +218,6 @@ function LiveSession() {
     setElapsed(0);
   }
 
-  function changeSpeaker(next: 'doctor' | 'patient' | 'unknown') {
-    setSpeaker(next);
-    socketRef.current?.send({ type: 'speaker.changed', speaker: next });
-  }
-
   async function finalizeManualTurn() {
     const text = manualText.trim();
     if (!text) return;
@@ -270,10 +228,10 @@ function LiveSession() {
       setStartedAt(Date.now());
       setMicState((m) => (m === 'not_requested' ? 'unavailable' : m));
     }
+    // No speaker label: the backend attributes the role from the conversation.
     socketRef.current?.send({
       type: 'transcript.final',
       event_id: socketRef.current.nextEventId(),
-      speaker: speakerRef.current,
       text,
     });
     setManualText('');
@@ -346,7 +304,9 @@ function LiveSession() {
           <p className="text-sm text-navy-soft">
             The live session needs the realtime backend on port 8000. Start it with{' '}
             <code className="rounded bg-canvas px-1.5 py-0.5 font-mono text-xs">npm run backend</code>{' '}
-            and reload this page. The <span className="font-medium">Text analysis</span> tab works without the backend.
+            and reload this page. The <span className="font-medium">Text Analysis</span> page (
+            <code className="rounded bg-canvas px-1.5 py-0.5 font-mono text-xs">/analyze</code>) works without the
+            backend.
           </p>
         </CardBody>
       </Card>
@@ -365,7 +325,7 @@ function LiveSession() {
           <span>
             {' '}
             <span className="font-semibold text-amber">Demo mode:</span> no server API key is configured, so microphone
-            transcription is unavailable — use a scripted demo conversation or the manual turn input below.
+            transcription is unavailable — use a scripted demo conversation or the conversation input below.
           </span>
         )}
       </div>
@@ -374,10 +334,10 @@ function LiveSession() {
         <div className="rounded-lg border border-danger/40 bg-danger/5 p-3 text-xs text-danger">{errorBanner}</div>
       )}
 
-      {/* Panel 1: session control */}
+      {/* Session control */}
       <Card>
         <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle>1 · Session</CardTitle>
+          <CardTitle>Session</CardTitle>
           <div className="flex flex-wrap items-center gap-1.5">
             <span
               className={cn(
@@ -410,25 +370,6 @@ function LiveSession() {
             </Button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex overflow-hidden rounded-lg border border-line" role="group" aria-label="Active speaker">
-              {(['doctor', 'patient', 'unknown'] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => changeSpeaker(s)}
-                  aria-pressed={speaker === s}
-                  className={cn(
-                    'px-3 py-1.5 text-xs font-medium capitalize',
-                    speaker === s ? 'bg-navy text-white' : 'bg-surface text-navy hover:bg-canvas',
-                  )}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-            <span className="text-[11px] text-ink-faint">Active speaker (shortcuts: D / P). Every finalized turn carries this label.</span>
-          </div>
-
           {scripts.length > 0 && (
             <div>
               <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
@@ -451,26 +392,12 @@ function LiveSession() {
             </div>
           )}
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div>
+          <details>
+            <summary className="cursor-pointer text-xs font-medium text-teal">More controls</summary>
+            <div className="mt-2 max-w-md">
               <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                Manual turn (text fallback / push-to-finalize)
+                Proposed prescription (doctor)
               </div>
-              <div className="flex gap-2">
-                <input
-                  value={manualText}
-                  onChange={(e) => setManualText(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && finalizeManualTurn()}
-                  placeholder={`${speaker}: e.g. "I take Tegretol."`}
-                  className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-navy placeholder:text-ink-faint focus:border-teal"
-                />
-                <Button variant="secondary" onClick={finalizeManualTurn} disabled={!manualText.trim()}>
-                  Finalize turn
-                </Button>
-              </div>
-            </div>
-            <div>
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Proposed prescription (doctor)</div>
               <div className="flex gap-2">
                 <input
                   value={proposalText}
@@ -484,39 +411,49 @@ function LiveSession() {
                 </Button>
               </div>
             </div>
-          </div>
+          </details>
         </CardBody>
       </Card>
 
-      {/* Panels 2-4 */}
+      {/* Conversation + live health warnings */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>2 · Live transcript</CardTitle>
+        <Card className="flex flex-col lg:col-span-2">
+          <CardHeader className="flex items-center justify-between gap-2">
+            <CardTitle>Conversation</CardTitle>
+            {processingTurn && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-ink-muted">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-teal" />
+                analyzing turn…
+              </span>
+            )}
           </CardHeader>
-          <CardBody>
+          <CardBody className="flex-1">
             <TranscriptPanel turns={turns} caption={caption} highlightTurnIds={highlightTurnIds} />
           </CardBody>
+          <div className="border-t border-line px-5 py-3">
+            <div className="flex gap-2">
+              <input
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && finalizeManualTurn()}
+                placeholder='Type what either party says — e.g. "I take Tegretol."'
+                className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-navy placeholder:text-ink-faint focus:border-teal"
+                aria-label="Add a conversation turn (speaker inferred automatically)"
+              />
+              <Button variant="secondary" onClick={finalizeManualTurn} disabled={!manualText.trim()}>
+                Finalize turn
+              </Button>
+            </div>
+            <p className="mt-1.5 text-[11px] text-ink-faint">
+              Speaker roles are attributed automatically — no need to say who is talking.
+            </p>
+          </div>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>3 · Encounter medication graph</CardTitle>
+            <CardTitle>Health warnings</CardTitle>
           </CardHeader>
-          <CardBody>
-            <GraphPanel
-              active={active}
-              inactive={inactive}
-              proposals={proposals}
-              onFocusTurn={focusTurn}
-              onCancelProposal={cancelProposal}
-            />
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>4 · Evidence relevance check</CardTitle>
-          </CardHeader>
-          <CardBody>
+          <CardBody className="max-h-[34rem] overflow-y-auto">
             <ResultPanel
               result={result}
               assertions={[...active, ...inactive]}
@@ -528,10 +465,37 @@ function LiveSession() {
         </Card>
       </div>
 
-      {/* Panel 5: always-running agent fleet */}
+      {/* Reasoning graph: how each warning traces back to the spoken turns */}
       <Card>
         <CardHeader>
-          <CardTitle>5 · Agent fleet (always-running workers)</CardTitle>
+          <CardTitle>Reasoning graph — turn → patient fact → evidence</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <ReasoningGraphPanel
+            turns={turns}
+            assertions={[...active, ...inactive]}
+            result={result}
+            onFocusTurn={focusTurn}
+          />
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs font-medium text-teal">Assertion detail & proposals</summary>
+            <div className="mt-2">
+              <GraphPanel
+                active={active}
+                inactive={inactive}
+                proposals={proposals}
+                onFocusTurn={focusTurn}
+                onCancelProposal={cancelProposal}
+              />
+            </div>
+          </details>
+        </CardBody>
+      </Card>
+
+      {/* Always-running agent fleet */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Agent fleet (always-running workers)</CardTitle>
         </CardHeader>
         <CardBody>
           <FleetPanel summary={fleetSummary} findings={fleetFindings} workers={fleetWorkers} />

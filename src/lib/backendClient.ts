@@ -148,6 +148,20 @@ export const backend = {
   fleetStatus: () => fetch('/api/fleet/status').then((r) => json<FleetStatus>(r)),
 };
 
+/**
+ * Everything the client may send over the encounter socket. Deliberately has
+ * no `speaker` field on transcript.final and no speaker.changed event: the
+ * backend attributes speaker roles itself, and re-adding a client-side label
+ * should be a compile error.
+ */
+export type ClientEvent =
+  | { type: 'session.start' }
+  | { type: 'session.stop' }
+  | { type: 'encounter.reset' }
+  | { type: 'transcript.final'; event_id: string; text: string }
+  | { type: 'prescription.proposed'; event_id: string; medication_surface_text: string }
+  | { type: 'prescription.cancelled'; event_id: string; proposal_id: string };
+
 export type ServerEvent =
   | ({ type: 'encounter.snapshot' } & EncounterState)
   | { type: 'caption.updated'; speaker: string; text: string; provisional: boolean }
@@ -207,7 +221,7 @@ export class EncounterSocket {
     };
   }
 
-  send(payload: Record<string, unknown>) {
+  send(payload: ClientEvent) {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(payload));
       return true;
