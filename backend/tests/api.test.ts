@@ -119,11 +119,13 @@ describe('REST API', () => {
     const enc = await createEncounter();
     const response = await post(`/api/encounters/${enc}/text-turn`, {
       speaker: 'patient',
+      source_speaker_label: 'speaker_0',
       text: 'I take carbamazepine and use the combined pill.',
     });
     expect(response.status).toBe(200);
     expect(response.json.result.state).toBe('EVIDENCE_FOUND');
     expect(response.json.result.active_warnings[0].evidence_record_id).toBe('INT-001');
+    expect(response.json.turns[0].source_speaker_label).toBe('speaker_0');
     // Medical wording is served verbatim from the record.
     expect(response.json.result.active_warnings[0].evidence_record.id).toBe('INT-001');
   });

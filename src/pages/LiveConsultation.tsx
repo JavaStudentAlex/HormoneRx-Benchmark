@@ -6,11 +6,17 @@ import GraphPanel from '../components/live/GraphPanel';
 import ResultPanel from '../components/live/ResultPanel';
 import ReasoningGraphPanel from '../components/live/ReasoningGraphPanel';
 import FleetPanel, { type FleetSummary } from '../components/live/FleetPanel';
+import AudioUploadDiarization, {
+  type ImportedDiarizedTurn,
+} from '../components/live/AudioUploadDiarization';
 import { downloadText } from '../lib/exportUtils';
 import { startAudioCapture, type AudioCaptureHandle } from '../lib/audioCapture';
 import {
   backend,
   EncounterSocket,
+  parseAudioServerEvent,
+  type AudioRelayState,
+  type AudioServerEvent,
   type BackendAssertion,
   type BackendHealth,
   type BackendProposal,
@@ -22,8 +28,16 @@ import {
   type ServerEvent,
 } from '../lib/backendClient';
 
-type SessionPhase = 'idle' | 'listening' | 'stopped';
+type SessionPhase = 'idle' | 'starting' | 'listening' | 'stopping' | 'stopped';
 type MicState = 'not_requested' | 'requesting' | 'active' | 'denied' | 'unavailable';
+type RelayUiState = AudioRelayState | 'off' | 'error';
+type AudioDrainedEvent = Extract<AudioServerEvent, { type: 'audio.drained' }>;
+
+interface PendingDrain {
+  resolve: (event: AudioDrainedEvent) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
 
 export default function LiveConsultation() {
   const [searchParams] = useSearchParams();
@@ -53,6 +67,7 @@ function LiveSession() {
   const [phase, setPhase] = useState<SessionPhase>('idle');
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed'>('closed');
   const [micState, setMicState] = useState<MicState>('not_requested');
+  const [relayState, setRelayState] = useState<RelayUiState>('off');
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [caption, setCaption] = useState<{ speaker: string; text: string } | null>(null);
@@ -66,6 +81,7 @@ function LiveSession() {
   const [manualText, setManualText] = useState('');
   const [proposalText, setProposalText] = useState('');
   const [playingScript, setPlayingScript] = useState<string | null>(null);
+  const [importingRecording, setImportingRecording] = useState(false);
   const [processingTurn, setProcessingTurn] = useState(false);
   const [fleetSummary, setFleetSummary] = useState<FleetSummary | null>(null);
   const [fleetFindings, setFleetFindings] = useState<FleetFinding[]>([]);
@@ -75,6 +91,8 @@ function LiveSession() {
   const encounterIdRef = useRef<string | null>(null);
   const micRef = useRef<AudioCaptureHandle | null>(null);
   const audioWsRef = useRef<WebSocket | null>(null);
+  const audioStoppingRef = useRef(false);
+  const pendingDrainRef = useRef<PendingDrain | null>(null);
 
   useEffect(() => {
     backend
@@ -93,9 +111,8 @@ function LiveSession() {
       })
       .catch(() => undefined);
     return () => {
-      stopMicrophone();
+      stopMicrophoneImmediately();
       socketRef.current?.close();
-      audioWsRef.current?.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -124,6 +141,9 @@ function LiveSession() {
       setCaption({ speaker: event.speaker, text: event.text });
     } else if (event.type === 'processing.error') {
       setErrorBanner(event.detail);
+    } else if (event.type === 'relay.state') {
+      setRelayState(event.state);
+      if (event.state === 'gave_up') setErrorBanner(`Live transcription unavailable: ${event.detail}`);
     } else if (event.type === 'fleet.status') {
       setFleetSummary({
         total_workers: event.total_workers,
@@ -142,72 +162,235 @@ function LiveSession() {
     }
   }, []);
 
-  async function ensureEncounter(): Promise<string> {
-    if (encounterIdRef.current) return encounterIdRef.current;
-    const { encounter_id } = await backend.createEncounter();
+  async function ensureEncounter(syntheticDemo = false): Promise<string> {
+    if (encounterIdRef.current && socketRef.current) {
+      await socketRef.current.waitUntilOpen();
+      return encounterIdRef.current;
+    }
+    const { encounter_id } = await backend.createEncounter(syntheticDemo);
     encounterIdRef.current = encounter_id;
     const socket = new EncounterSocket(encounter_id, applyState, setWsStatus);
     socket.connect();
     socketRef.current = socket;
-    // Give the socket a moment to open so session.start is not dropped.
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await socket.waitUntilOpen();
     return encounter_id;
   }
 
   async function startListening() {
     setErrorBanner(null);
+    setPhase('starting');
+    setRelayState('off');
     try {
+      const currentHealth = health ?? (await backend.health());
+      if (!health) setHealth(currentHealth);
       await ensureEncounter();
-      socketRef.current?.send({ type: 'session.start' });
-      setPhase('listening');
+      if (!socketRef.current?.send({ type: 'session.start' })) {
+        throw new Error('The encounter connection is not ready');
+      }
       setStartedAt(Date.now());
-      if (health?.live_transcription_available) {
+      if (currentHealth.live_transcription_available) {
         await startMicrophone();
       } else {
         setMicState('unavailable');
       }
+      setPhase('listening');
     } catch (err) {
-      setBackendDown(true);
-      setErrorBanner('The realtime backend is not reachable. Start it with: npm run backend');
+      stopMicrophoneImmediately();
+      socketRef.current?.send({ type: 'session.stop' });
+      const permissionDenied = err instanceof DOMException && ['NotAllowedError', 'SecurityError'].includes(err.name);
+      setMicState(permissionDenied ? 'denied' : 'unavailable');
+      setPhase('stopped');
+      setStartedAt(null);
+      setErrorBanner(err instanceof Error ? err.message : 'Live transcription could not start');
     }
   }
 
   async function startMicrophone() {
     const encounterId = encounterIdRef.current;
-    if (!encounterId) return;
+    if (!encounterId) throw new Error('No encounter is available for audio capture');
     setMicState('requesting');
+    setRelayState('connecting');
+    audioStoppingRef.current = false;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const audioWs = new WebSocket(`${protocol}://${window.location.host}/ws/encounters/${encounterId}/audio`);
+    audioWs.binaryType = 'arraybuffer';
+    audioWsRef.current = audioWs;
+
+    let readySettled = false;
+    let resolveReady!: () => void;
+    let rejectReady!: (error: Error) => void;
+    const ready = new Promise<void>((resolve, reject) => {
+      resolveReady = resolve;
+      rejectReady = reject;
+    });
+    const settleReady = (error?: Error): void => {
+      if (readySettled) return;
+      readySettled = true;
+      if (error) rejectReady(error);
+      else resolveReady();
+    };
+
+    const rejectDrain = (error: Error): void => {
+      const pending = pendingDrainRef.current;
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      pendingDrainRef.current = null;
+      pending.reject(error);
+    };
+
+    const failAudio = (error: Error): void => {
+      settleReady(error);
+      rejectDrain(error);
+      setRelayState('error');
+      setErrorBanner(error.message);
+      if (audioStoppingRef.current) return;
+
+      audioStoppingRef.current = true;
+      audioWs.close();
+      const mic = micRef.current;
+      micRef.current = null;
+      mic?.stop();
+      setMicState('unavailable');
+    };
+
+    audioWs.onmessage = (message) => {
+      const event = parseAudioServerEvent(message.data);
+      if (!event) return;
+      if (event.type === 'relay.state') {
+        setRelayState(event.state);
+        if (event.state === 'connected') settleReady();
+        if (event.state === 'gave_up' || event.state === 'closed') {
+          failAudio(new Error(`Live transcription unavailable: ${event.detail}`));
+        }
+      } else if (event.type === 'processing.error') {
+        failAudio(new Error(event.detail));
+      } else if (event.type === 'audio.drained') {
+        const pending = pendingDrainRef.current;
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        pendingDrainRef.current = null;
+        pending.resolve(event);
+      }
+    };
+    audioWs.onerror = () => {
+      failAudio(new Error('The live transcription connection failed'));
+    };
+    audioWs.onclose = () => {
+      const error = new Error('The live transcription connection closed');
+      settleReady(error);
+      rejectDrain(error);
+      if (!audioStoppingRef.current) failAudio(error);
+    };
+
+    const readyTimer = setTimeout(
+      () => settleReady(new Error('Live transcription did not become ready in time')),
+      15_000,
+    );
     try {
-      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const audioWs = new WebSocket(`${protocol}://${window.location.host}/ws/encounters/${encounterId}/audio`);
-      audioWs.binaryType = 'arraybuffer';
-      audioWsRef.current = audioWs;
-      const mic = await startAudioCapture((chunk) => {
-        if (audioWs.readyState === WebSocket.OPEN) audioWs.send(chunk);
+      await ready;
+      clearTimeout(readyTimer);
+      if (audioWs.readyState !== WebSocket.OPEN || audioWsRef.current !== audioWs) {
+        throw new Error('The live transcription connection closed before capture started');
+      }
+      const mic = await startAudioCapture({
+        onChunk: (chunk) => {
+          if (audioWs.readyState === WebSocket.OPEN) {
+            audioWs.send(chunk);
+          } else if (!audioStoppingRef.current) {
+            setErrorBanner('Audio capture stopped because the transcription connection was lost');
+          }
+        },
+        onUtteranceEnd: () => {
+          if (audioWs.readyState === WebSocket.OPEN) {
+            audioWs.send(JSON.stringify({ type: 'audio.commit' }));
+          }
+        },
       });
+      if (audioWs.readyState !== WebSocket.OPEN || audioWsRef.current !== audioWs) {
+        mic.stop();
+        throw new Error('The live transcription connection closed before capture started');
+      }
       micRef.current = mic;
       setMicState('active');
-    } catch {
-      setMicState('denied');
-      setErrorBanner('Microphone unavailable or permission denied. The scripted demo and manual turn input still work.');
+    } catch (err) {
+      clearTimeout(readyTimer);
+      throw err;
     }
   }
 
-  function stopMicrophone() {
+  function stopMicrophoneImmediately() {
+    audioStoppingRef.current = true;
     micRef.current?.stop();
     micRef.current = null;
+    const pending = pendingDrainRef.current;
+    if (pending) {
+      clearTimeout(pending.timer);
+      pendingDrainRef.current = null;
+      pending.reject(new Error('Audio drain was cancelled'));
+    }
     audioWsRef.current?.close();
     audioWsRef.current = null;
   }
 
-  function stopListening() {
+  function waitForAudioDrain(timeoutMs = 35_000): Promise<AudioDrainedEvent> {
+    return new Promise<AudioDrainedEvent>((resolve, reject) => {
+      const pending: PendingDrain = {
+        resolve,
+        reject,
+        timer: setTimeout(() => {
+          if (pendingDrainRef.current === pending) pendingDrainRef.current = null;
+          reject(new Error('Timed out while finalizing the last transcript'));
+        }, timeoutMs),
+      };
+      pendingDrainRef.current = pending;
+    });
+  }
+
+  async function stopListening() {
+    if (phase !== 'listening') return;
+    setPhase('stopping');
+    audioStoppingRef.current = true;
+    const audioWs = audioWsRef.current;
+    const stopResult = micRef.current?.stop() ?? { shouldCommit: false };
+    micRef.current = null;
+
+    try {
+      if (audioWs) {
+        if (audioWs.readyState !== WebSocket.OPEN) {
+          throw new Error('The live transcription connection closed before the final transcript was drained');
+        }
+        setRelayState('draining');
+        const drained = waitForAudioDrain();
+        if (stopResult.shouldCommit) audioWs.send(JSON.stringify({ type: 'audio.commit' }));
+        audioWs.send(JSON.stringify({ type: 'audio.stop' }));
+        const outcome = await drained;
+        if (outcome.timed_out) {
+          setErrorBanner('The final transcript did not complete before the transcription drain timed out');
+        }
+      }
+    } catch (err) {
+      setRelayState('error');
+      setErrorBanner(err instanceof Error ? err.message : 'The final transcript could not be drained');
+    } finally {
+      audioWs?.close();
+      if (audioWsRef.current === audioWs) audioWsRef.current = null;
+    }
+
     socketRef.current?.send({ type: 'session.stop' });
-    stopMicrophone();
     setMicState('not_requested');
+    setRelayState('off');
     setPhase('stopped');
     setStartedAt(null);
   }
 
-  function clearEncounter() {
+  function finishCurrentAudioTurn() {
+    if (phase !== 'listening' || micState !== 'active') return;
+    micRef.current?.commitCurrentUtterance();
+  }
+
+  async function clearEncounter() {
+    if (phase === 'listening') await stopListening();
     socketRef.current?.send({ type: 'encounter.reset' });
     setTurns([]);
     setCaption(null);
@@ -216,13 +399,66 @@ function LiveSession() {
     setPhase('idle');
     setStartedAt(null);
     setElapsed(0);
+    setMicState('not_requested');
+    setRelayState('off');
+  }
+
+  async function importDiarizedTurns(importedTurns: ImportedDiarizedTurn[]) {
+    if (importingRecording || importedTurns.length === 0) return;
+    setImportingRecording(true);
+    setErrorBanner(null);
+
+    let encounterId: string | null = null;
+    let encounterStarted = false;
+    let failure: unknown = null;
+    try {
+      encounterId = await ensureEncounter();
+      await backend.startEncounter(encounterId);
+      encounterStarted = true;
+      setStartedAt(Date.now());
+
+      for (let index = 0; index < importedTurns.length; index++) {
+        const turn = importedTurns[index];
+        const text = turn.text.trim();
+        if (!text) continue;
+        const stableTurnId = `upload-${turn.import_id}-${index}-${turn.segment_id}`;
+        await backend.addTextTurn(encounterId, {
+          event_id: stableTurnId,
+          text,
+          speaker: turn.speaker,
+          source_speaker_label: turn.source_speaker,
+          provider_item_id: stableTurnId,
+          started_at_ms: turn.started_at_ms,
+          ended_at_ms: turn.ended_at_ms,
+        });
+      }
+    } catch (error) {
+      failure = error;
+    } finally {
+      if (encounterId && encounterStarted) {
+        try {
+          await backend.stopEncounter(encounterId);
+        } catch (stopError) {
+          failure ??= stopError;
+        }
+      }
+      setStartedAt(null);
+      setPhase('stopped');
+      setImportingRecording(false);
+    }
+
+    if (failure) {
+      const message = failure instanceof Error ? failure.message : 'The recorded consultation could not be imported';
+      setErrorBanner(message);
+      throw failure;
+    }
   }
 
   async function finalizeManualTurn() {
     const text = manualText.trim();
-    if (!text) return;
+    if (!text || phase === 'starting' || phase === 'stopping') return;
     await ensureEncounter();
-    if (phase === 'idle') {
+    if (phase === 'idle' || phase === 'stopped') {
       socketRef.current?.send({ type: 'session.start' });
       setPhase('listening');
       setStartedAt(Date.now());
@@ -260,7 +496,7 @@ function LiveSession() {
   async function playScript(scriptId: string) {
     setErrorBanner(null);
     try {
-      const encounterId = await ensureEncounter();
+      const encounterId = await ensureEncounter(true);
       if (phase !== 'listening') {
         socketRef.current?.send({ type: 'session.start' });
         setPhase('listening');
@@ -295,6 +531,24 @@ function LiveSession() {
     const s = elapsed % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
   }, [elapsed]);
+  const phaseBusy = phase === 'starting' || phase === 'stopping';
+  const sessionBusy = phaseBusy || importingRecording;
+  const recordingImportDisabled =
+    importingRecording ||
+    !health?.audio_diarization_available ||
+    (phase !== 'idle' && phase !== 'stopped');
+  const phaseLabel =
+    importingRecording
+      ? 'Importing recording'
+      : phase === 'starting'
+      ? 'Starting'
+      : phase === 'listening'
+        ? `Listening · ${duration}`
+        : phase === 'stopping'
+          ? 'Finishing'
+          : phase === 'stopped'
+            ? 'Stopped'
+            : 'Not started';
 
   if (backendDown) {
     return (
@@ -342,30 +596,61 @@ function LiveSession() {
             <span
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
-                phase === 'listening' ? 'border-danger/40 bg-danger/10 text-danger' : 'border-line bg-canvas text-ink-muted',
+                phase === 'listening'
+                  ? 'border-danger/40 bg-danger/10 text-danger'
+                  : sessionBusy
+                    ? 'border-amber/40 bg-amber/10 text-amber'
+                    : 'border-line bg-canvas text-ink-muted',
               )}
             >
-              <span className={cn('h-2 w-2 rounded-full', phase === 'listening' ? 'animate-pulse bg-danger' : 'bg-ink-faint')} />
-              {phase === 'listening' ? `Listening · ${duration}` : phase === 'stopped' ? 'Stopped' : 'Not started'}
+              <span
+                className={cn(
+                  'h-2 w-2 rounded-full',
+                  phase === 'listening'
+                    ? 'animate-pulse bg-danger'
+                    : sessionBusy
+                      ? 'animate-pulse bg-amber'
+                      : 'bg-ink-faint',
+                )}
+              />
+              {phaseLabel}
             </span>
             <Badge tone={micState === 'active' ? 'teal' : micState === 'denied' ? 'danger' : 'muted'}>
               mic: {micState === 'not_requested' ? 'off' : micState}
+            </Badge>
+            <Badge tone={relayState === 'connected' ? 'teal' : relayState === 'error' || relayState === 'gave_up' ? 'danger' : 'muted'}>
+              stt: {relayState}
             </Badge>
             <Badge tone={wsStatus === 'open' ? 'teal' : 'muted'}>ws: {wsStatus}</Badge>
           </div>
         </CardHeader>
         <CardBody className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={startListening} disabled={phase === 'listening'}>
-              Start listening
+            <Button onClick={startListening} disabled={phase === 'listening' || sessionBusy}>
+              {phase === 'starting' ? 'Starting…' : 'Start listening'}
             </Button>
-            <Button variant="secondary" onClick={stopListening} disabled={phase !== 'listening'}>
-              Stop listening
+            <Button
+              variant="secondary"
+              onClick={stopListening}
+              disabled={phase !== 'listening' || importingRecording}
+            >
+              {phase === 'stopping' ? 'Finishing…' : 'Stop listening'}
             </Button>
-            <Button variant="ghost" onClick={clearEncounter}>
+            <Button
+              variant="secondary"
+              onClick={finishCurrentAudioTurn}
+              disabled={phase !== 'listening' || micState !== 'active' || importingRecording}
+            >
+              Finish turn
+            </Button>
+            <Button variant="ghost" onClick={clearEncounter} disabled={sessionBusy}>
               Clear encounter
             </Button>
-            <Button variant="ghost" onClick={exportAudit} disabled={!encounterIdRef.current}>
+            <Button
+              variant="ghost"
+              onClick={exportAudit}
+              disabled={!encounterIdRef.current || importingRecording}
+            >
               Export audit JSON
             </Button>
           </div>
@@ -382,7 +667,7 @@ function LiveSession() {
                     variant="secondary"
                     className="px-2.5 py-1.5 text-xs"
                     title={script.description}
-                    disabled={playingScript !== null}
+                    disabled={playingScript !== null || sessionBusy}
                     onClick={() => playScript(script.id)}
                   >
                     {playingScript === script.id ? 'Playing…' : script.label}
@@ -403,15 +688,26 @@ function LiveSession() {
                   value={proposalText}
                   onChange={(e) => setProposalText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && proposePrescription()}
+                  disabled={sessionBusy}
                   placeholder='e.g. "Lamotrigine"'
                   className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-navy placeholder:text-ink-faint focus:border-teal"
                 />
-                <Button variant="secondary" onClick={proposePrescription} disabled={!proposalText.trim()}>
+                <Button
+                  variant="secondary"
+                  onClick={proposePrescription}
+                  disabled={!proposalText.trim() || sessionBusy}
+                >
                   Propose
                 </Button>
               </div>
             </div>
           </details>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody>
+          <AudioUploadDiarization onImport={importDiarizedTurns} disabled={recordingImportDisabled} />
         </CardBody>
       </Card>
 
@@ -436,11 +732,16 @@ function LiveSession() {
                 value={manualText}
                 onChange={(e) => setManualText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && finalizeManualTurn()}
+                disabled={sessionBusy}
                 placeholder='Type what either party says — e.g. "I take Tegretol."'
                 className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-navy placeholder:text-ink-faint focus:border-teal"
                 aria-label="Add a conversation turn (speaker inferred automatically)"
               />
-              <Button variant="secondary" onClick={finalizeManualTurn} disabled={!manualText.trim()}>
+              <Button
+                variant="secondary"
+                onClick={finalizeManualTurn}
+                disabled={!manualText.trim() || sessionBusy}
+              >
                 Finalize turn
               </Button>
             </div>

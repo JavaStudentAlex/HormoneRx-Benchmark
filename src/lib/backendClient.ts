@@ -7,6 +7,7 @@ export interface BackendHealth {
   demo_mode: boolean;
   live_extraction_available: boolean;
   live_transcription_available: boolean;
+  audio_diarization_available: boolean;
   extraction_model: string;
   transcription_model: string;
   evidence: {
@@ -15,6 +16,69 @@ export interface BackendHealth {
     runtimeEligible: string[];
     pendingPhysicianSignOff: string[];
   };
+}
+
+export type AudioRelayState =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'draining'
+  | 'closed'
+  | 'gave_up';
+
+export type RelayDiagnostics = Record<string, unknown>;
+
+const AUDIO_RELAY_STATES = new Set<AudioRelayState>([
+  'connecting',
+  'connected',
+  'reconnecting',
+  'draining',
+  'closed',
+  'gave_up',
+]);
+
+export type AudioServerEvent =
+  | {
+      type: 'relay.state';
+      state: AudioRelayState;
+      detail: string;
+      diagnostics?: RelayDiagnostics;
+    }
+  | { type: 'processing.error'; detail: string }
+  | {
+      type: 'audio.drained';
+      committed: number;
+      completed: number;
+      timed_out: boolean;
+      diagnostics?: RelayDiagnostics;
+    };
+
+export function parseAudioServerEvent(data: unknown): AudioServerEvent | null {
+  try {
+    const parsed = JSON.parse(String(data)) as Record<string, unknown>;
+    if (parsed.type === 'processing.error' && typeof parsed.detail === 'string') {
+      return { type: 'processing.error', detail: parsed.detail };
+    }
+    if (
+      parsed.type === 'relay.state' &&
+      typeof parsed.state === 'string' &&
+      AUDIO_RELAY_STATES.has(parsed.state as AudioRelayState) &&
+      typeof parsed.detail === 'string'
+    ) {
+      return parsed as AudioServerEvent;
+    }
+    if (
+      parsed.type === 'audio.drained' &&
+      typeof parsed.committed === 'number' &&
+      typeof parsed.completed === 'number' &&
+      typeof parsed.timed_out === 'boolean'
+    ) {
+      return parsed as AudioServerEvent;
+    }
+  } catch {
+    // Ignore non-JSON frames from an incompatible proxy/provider.
+  }
+  return null;
 }
 
 export interface BackendAssertion {
@@ -64,6 +128,7 @@ export interface BackendTurn {
   turn_id: string;
   sequence: number;
   speaker: string;
+  source_speaker_label?: string | null;
   text: string;
   arrived_late: boolean;
 }
@@ -82,6 +147,16 @@ export interface EncounterState {
   proposals: BackendProposal[];
   result: BackendResult;
   status?: string;
+}
+
+export interface AddTextTurnPayload {
+  event_id: string;
+  text: string;
+  speaker: 'doctor' | 'patient' | 'other_person' | 'unknown' | null;
+  source_speaker_label: string | null;
+  provider_item_id: string;
+  started_at_ms: number;
+  ended_at_ms: number;
 }
 
 export interface DemoScript {
@@ -135,12 +210,29 @@ async function json<T>(response: Response): Promise<T> {
 export const backend = {
   health: () => fetch('/api/health').then((r) => json<BackendHealth>(r)),
   demoScripts: () => fetch('/api/demo-scripts').then((r) => json<{ scripts: DemoScript[] }>(r)),
-  createEncounter: () =>
+  createEncounter: (syntheticDemo = false) =>
     fetch('/api/encounters', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ synthetic_demo: true }),
+      body: JSON.stringify({ synthetic_demo: syntheticDemo }),
     }).then((r) => json<{ encounter_id: string }>(r)),
+  startEncounter: (encounterId: string) =>
+    fetch(`/api/encounters/${encounterId}/start`, { method: 'POST' }).then((r) =>
+      json<{ status: string }>(r),
+    ),
+  stopEncounter: (encounterId: string) =>
+    fetch(`/api/encounters/${encounterId}/stop`, { method: 'POST' }).then((r) =>
+      json<{ status: string }>(r),
+    ),
+  addTextTurn: async (encounterId: string, payload: AddTextTurnPayload) => {
+    const response = await fetch(`/api/encounters/${encounterId}/text-turn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (response.status === 409) return { duplicate: true as const };
+    return json<EncounterState>(response);
+  },
   playScript: (encounterId: string, scriptId: string) =>
     fetch(`/api/encounters/${encounterId}/demo-script/${scriptId}`, { method: 'POST' }).then((r) => json(r)),
   audit: (encounterId: string) => fetch(`/api/encounters/${encounterId}/audit`).then((r) => json<object>(r)),
@@ -181,13 +273,23 @@ export type ServerEvent =
       review_queue_size: number;
       recent_findings: FleetFinding[];
     }
-  | { type: 'relay.state'; state: string; detail: string };
+  | {
+      type: 'relay.state';
+      state: AudioRelayState;
+      detail: string;
+      diagnostics?: RelayDiagnostics;
+    };
 
 export class EncounterSocket {
   private ws: WebSocket | null = null;
   private closedByUser = false;
   private retryMs = 500;
   private eventCounter = 0;
+  private openWaiters = new Set<{
+    resolve: () => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
 
   constructor(
     private encounterId: string,
@@ -203,6 +305,11 @@ export class EncounterSocket {
     this.ws.onopen = () => {
       this.retryMs = 500;
       this.onStatus('open');
+      for (const waiter of this.openWaiters) {
+        clearTimeout(waiter.timer);
+        waiter.resolve();
+      }
+      this.openWaiters.clear();
     };
     this.ws.onmessage = (message) => {
       try {
@@ -229,6 +336,21 @@ export class EncounterSocket {
     return false;
   }
 
+  waitUntilOpen(timeoutMs = 5000): Promise<void> {
+    if (this.ws?.readyState === WebSocket.OPEN) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      const waiter = {
+        resolve,
+        reject,
+        timer: setTimeout(() => {
+          this.openWaiters.delete(waiter);
+          reject(new Error('Encounter connection timed out'));
+        }, timeoutMs),
+      };
+      this.openWaiters.add(waiter);
+    });
+  }
+
   nextEventId(): string {
     this.eventCounter += 1;
     return `ui-${this.encounterId}-${this.eventCounter}-${Date.now()}`;
@@ -236,6 +358,11 @@ export class EncounterSocket {
 
   close() {
     this.closedByUser = true;
+    for (const waiter of this.openWaiters) {
+      clearTimeout(waiter.timer);
+      waiter.reject(new Error('Encounter connection closed'));
+    }
+    this.openWaiters.clear();
     this.ws?.close();
   }
 }

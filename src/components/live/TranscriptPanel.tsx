@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '../ui/primitives';
 import type { BackendTurn } from '../../lib/backendClient';
+import {
+  acousticSpeakerDisplayLabel,
+  acousticSpeakerStyle,
+} from './acousticSpeakerStyles';
 
 export const speakerTone: Record<string, 'teal' | 'navy' | 'muted' | 'amber'> = {
   patient: 'teal',
@@ -20,6 +24,10 @@ const bubbleStyle: Record<string, { align: string; bubble: string; dot: string }
 
 function bubbleFor(speaker: string) {
   return bubbleStyle[speaker] ?? bubbleStyle.unknown;
+}
+
+function roleLabel(speaker: string): string {
+  return speaker.replaceAll('_', ' ');
 }
 
 export default function TranscriptPanel({
@@ -45,7 +53,8 @@ export default function TranscriptPanel({
         </p>
       )}
       {turns.map((turn) => {
-        const style = bubbleFor(turn.speaker);
+        const sourceSpeaker = turn.source_speaker_label?.trim() || null;
+        const style = sourceSpeaker ? acousticSpeakerStyle(sourceSpeaker) : bubbleFor(turn.speaker);
         return (
           <div key={turn.turn_id} className={cn('flex flex-col', style.align)}>
             <div
@@ -54,11 +63,14 @@ export default function TranscriptPanel({
                 highlightTurnIds.has(turn.turn_id) ? 'border-amber/50 bg-amber/5' : style.bubble,
               )}
             >
-              <div className="flex items-center gap-1.5">
-                <span className={cn('h-2 w-2 rounded-full', style.dot)} />
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={cn('h-2 w-2 shrink-0 rounded-full', style.dot)} />
                 <span className="text-[11px] font-semibold capitalize text-navy">
-                  {turn.speaker.replaceAll('_', ' ')}
+                  {sourceSpeaker ? acousticSpeakerDisplayLabel(sourceSpeaker) : roleLabel(turn.speaker)}
                 </span>
+                {sourceSpeaker && (
+                  <span className="text-[10px] capitalize text-ink-muted">{roleLabel(turn.speaker)} role</span>
+                )}
                 <span className="font-mono text-[10px] text-ink-faint">{turn.turn_id}</span>
                 {turn.arrived_late && (
                   <span className="rounded-full border border-amber/40 bg-amber/10 px-1.5 text-[10px] text-amber">

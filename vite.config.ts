@@ -8,8 +8,8 @@ export default defineConfig({
     strictPort: true,
     // The TypeScript realtime backend (Express + ws) serves /api and /ws on :8000.
     proxy: {
-      '/api': { target: 'http://localhost:8000', changeOrigin: true },
-      '/ws': { target: 'ws://localhost:8000', ws: true },
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/ws': { target: 'ws://127.0.0.1:8000', ws: true },
     },
   },
   test: {

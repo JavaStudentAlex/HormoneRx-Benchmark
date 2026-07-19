@@ -4,9 +4,10 @@
  * (spec §19, §21). Express + ws port of the former FastAPI app — identical
  * routes and identical JSON wire format, so the React frontend is unchanged.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { loadEnvFile } from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import express, { type Request, type Response } from 'express';
@@ -15,13 +16,24 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { buildAuditExport } from './audit.ts';
 import { BACKEND_DIR, Settings, getSettings, liveExtractionAvailable } from './config.ts';
 import { EXTRACTOR_VERSION } from './deterministicExtractor.ts';
+import { createDiarizationRouter } from './diarization.ts';
 import { DuplicateEventError, EncounterRuntime, EncounterService } from './encounterService.ts';
 import { EvidenceIndex, EvidenceValidationError } from './evidenceIndex.ts';
 import { LiveExtractor, buildExtractor } from './extractor.ts';
 import { buildFleet } from './fleet/registry.ts';
 import { FleetSupervisor } from './fleet/supervisor.ts';
 import { EventType, SPEAKER_VALUES, Speaker, newId } from './models.ts';
-import { RealtimeSessionError, RelaySupervisor, mintClientSecret } from './realtimeSession.ts';
+import {
+  RealtimeSessionError,
+  RelaySupervisor,
+  mintClientSecret,
+  type RelayItemFailure,
+} from './realtimeSession.ts';
+
+const AUDIO_DRAIN_TIMEOUT_MS = 30_000;
+const ENCOUNTER_WS_MAX_PAYLOAD_BYTES = 256 * 1024;
+const AUDIO_WS_MAX_PAYLOAD_BYTES = 64 * 1024;
+const activeAudioRelays = new WeakSet<EncounterRuntime>();
 
 interface DemoScript {
   id: string;
@@ -40,6 +52,27 @@ export interface Backend {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Serializes binary frames and JSON controls in WebSocket arrival order. */
+export class SerializedAudioIngress {
+  private tail: Promise<void> = Promise.resolve();
+
+  constructor(private onError: (error: unknown) => void) {}
+
+  enqueue(task: () => void | Promise<void>): void {
+    this.tail = this.tail.then(task).catch((error) => {
+      try {
+        this.onError(error);
+      } catch {
+        // Error reporting must not permanently reject the ingress chain.
+      }
+    });
+  }
+
+  idle(): Promise<void> {
+    return this.tail;
+  }
 }
 
 function parseSpeaker(value: unknown, fallback: Speaker = Speaker.PATIENT): Speaker {
@@ -103,6 +136,7 @@ export function createBackend(settings: Settings = getSettings()): Backend {
     }
     next();
   });
+  app.use(createDiarizationRouter(settings));
 
   const getRuntime = (req: Request, res: Response): EncounterRuntime | null => {
     const runtime = service.encounters.get(String(req.params.encounterId)) ?? null;
@@ -132,6 +166,7 @@ export function createBackend(settings: Settings = getSettings()): Backend {
       demo_mode: settings.demo_mode,
       live_extraction_available: liveExtractionAvailable(settings),
       live_transcription_available: Boolean(settings.openai_api_key),
+      audio_diarization_available: Boolean(settings.openai_api_key),
       extraction_model:
         liveExtractionAvailable(settings) && !settings.demo_mode
           ? settings.extraction_model
@@ -257,6 +292,13 @@ export function createBackend(settings: Settings = getSettings()): Backend {
           text: String(req.body?.text ?? ''),
           speaker: parseOptionalSpeaker(req.body?.speaker),
           sequence: (req.body?.sequence as number | undefined) ?? null,
+          provider_item_id: (req.body?.provider_item_id as string | undefined) ?? null,
+          source_speaker_label:
+            typeof req.body?.source_speaker_label === 'string'
+              ? req.body.source_speaker_label.slice(0, 100)
+              : undefined,
+          started_at_ms: (req.body?.started_at_ms as number | undefined) ?? null,
+          ended_at_ms: (req.body?.ended_at_ms as number | undefined) ?? null,
         }),
       )
       .then(() => res.json(service.snapshotPayload(runtime)))
@@ -321,8 +363,14 @@ export function createBackend(settings: Settings = getSettings()): Backend {
   // -- WebSockets (spec §21.3) ---------------------------------------------
 
   const server = http.createServer(app);
-  const encounterWss = new WebSocketServer({ noServer: true });
-  const audioWss = new WebSocketServer({ noServer: true });
+  const encounterWss = new WebSocketServer({
+    noServer: true,
+    maxPayload: ENCOUNTER_WS_MAX_PAYLOAD_BYTES,
+  });
+  const audioWss = new WebSocketServer({
+    noServer: true,
+    maxPayload: AUDIO_WS_MAX_PAYLOAD_BYTES,
+  });
 
   server.on('upgrade', (request, socket, head) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
@@ -505,6 +553,14 @@ async function handleAudioSocket(
     return;
   }
 
+  const sendAudioMessage = (message: Record<string, unknown>): void => {
+    try {
+      ws.send(JSON.stringify(message));
+    } catch {
+      // The audio client may have closed while the provider was draining.
+    }
+  };
+
   const onPartial = (text: string): void => {
     service.broadcast(runtime, {
       type: 'caption.updated',
@@ -516,7 +572,14 @@ async function handleAudioSocket(
     });
   };
 
-  const onFinal = async (itemId: string | null, text: string): Promise<void> => {
+  const onFinal = async (
+    itemId: string | null,
+    text: string,
+    _commitOrdinal: number | null,
+  ): Promise<void> => {
+    // A committed buffer can legitimately contain only silence. It still
+    // completes the drain handshake but is not a transcript turn.
+    if (!text.trim()) return;
     try {
       await service.processFinalTurn(runtime, {
         event_id: newId('evt'),
@@ -541,30 +604,56 @@ async function handleAudioSocket(
     return;
   }
 
+  if (activeAudioRelays.has(runtime)) {
+    sendAudioMessage({
+      type: 'processing.error',
+      detail: 'A live transcription connection is already active for this encounter.',
+    });
+    ws.close(4429);
+    return;
+  }
+  activeAudioRelays.add(runtime);
+
+  const onItemFailure = (failure: RelayItemFailure): void => {
+    const detail =
+      failure.stage === 'transcription'
+        ? `Transcription failed for committed audio turn ${failure.commitOrdinal}.`
+        : `Processing failed for transcribed audio turn ${failure.commitOrdinal}.`;
+    runtime.store.append(EventType.TRANSCRIPTION_FAILED, {
+      error: detail,
+      stage: failure.stage,
+      provider_item_id: failure.itemId,
+      commit_ordinal: failure.commitOrdinal,
+      provider_error_code: failure.code,
+    });
+    const errorEvent = { type: 'processing.error', detail };
+    service.broadcast(runtime, errorEvent);
+  };
+
   // Supervised relay: reconnects with backoff when the provider closes the
   // socket mid-session, so long consultations survive provider session caps.
   const relaySupervisor = new RelaySupervisor(settings, onPartial, onFinal, {
-    onStateChange: (state, detail) => {
+    onItemFailure,
+    onStateChange: (state, detail, diagnostics) => {
       if (state === 'reconnecting' || state === 'gave_up') {
         runtime.store.append(EventType.TRANSCRIPTION_FAILED, { error: `relay ${state}: ${detail}` });
       }
-      service.broadcast(runtime, { type: 'relay.state', state, detail });
+      const stateEvent = { type: 'relay.state', state, detail, diagnostics };
+      service.broadcast(runtime, stateEvent);
+      sendAudioMessage(stateEvent);
     },
   });
 
   const done = relaySupervisor.run().catch((err) => {
     if (err instanceof RealtimeSessionError) {
       runtime.store.append(EventType.TRANSCRIPTION_FAILED, { error: err.message });
-      try {
-        ws.send(
-          JSON.stringify({
-            type: 'processing.error',
-            detail: `Live transcription unavailable: ${err.message}`,
-          }),
-        );
-      } catch {
-        // client already gone
-      }
+      const errorEvent = {
+        type: 'processing.error',
+        detail: `Live transcription unavailable: ${err.message}`,
+        diagnostics: relaySupervisor.diagnostics(),
+      };
+      sendAudioMessage(errorEvent);
+      service.broadcast(runtime, errorEvent);
       ws.close(4503);
     } else {
       console.error('relay failed:', err);
@@ -572,26 +661,82 @@ async function handleAudioSocket(
     }
   });
 
+  let stopping = false;
+
+  const reportControlError = (error: unknown): void => {
+    const detail = error instanceof Error ? error.message : 'audio control failed';
+    const errorEvent = {
+      type: 'processing.error',
+      detail: `Live transcription control failed: ${detail}`,
+      diagnostics: relaySupervisor.diagnostics(),
+    };
+    sendAudioMessage(errorEvent);
+    service.broadcast(runtime, errorEvent);
+  };
+
+  const handleControl = async (control: Record<string, unknown>): Promise<void> => {
+    if (control.type === 'speaker.changed') {
+      await service.changeSpeaker(runtime, parseSpeaker(control.speaker));
+      return;
+    }
+    if (control.type === 'audio.commit') {
+      const result = await relaySupervisor.commit();
+      sendAudioMessage({
+        type: 'audio.committed',
+        committed: result.committed,
+        commit_ordinal: result.commitOrdinal,
+        diagnostics: relaySupervisor.diagnostics(),
+      });
+      return;
+    }
+    if (control.type === 'audio.stop') {
+      stopping = true;
+      const result = await relaySupervisor.commitAndWait(AUDIO_DRAIN_TIMEOUT_MS);
+      if (result.timedOut) {
+        const detail = 'transcription drain timed out before the provider completed the final committed audio';
+        runtime.store.append(EventType.TRANSCRIPTION_FAILED, { error: detail });
+        service.broadcast(runtime, { type: 'processing.error', detail });
+      }
+      const diagnostics = relaySupervisor.diagnostics();
+      sendAudioMessage({
+        type: 'audio.drained',
+        committed: diagnostics.provider_commits,
+        completed: diagnostics.provider_completed_commits,
+        timed_out: result.timedOut,
+        commit_ordinal: result.commitOrdinal,
+        diagnostics,
+      });
+      return;
+    }
+    sendAudioMessage({ type: 'processing.error', detail: `unknown audio control '${String(control.type)}'` });
+  };
+
+  const ingress = new SerializedAudioIngress(reportControlError);
+
   ws.on('message', (data, isBinary) => {
     if (isBinary) {
-      void relaySupervisor
-        .sendAudio(data as Buffer)
-        .catch((err) => console.error('relay send failed:', err));
+      const frame = Buffer.from(data as Buffer);
+      ingress.enqueue(async () => {
+        if (stopping) return;
+        await relaySupervisor.sendAudio(frame);
+      });
     } else {
       try {
-        const control = JSON.parse(String(data));
-        if (control.type === 'speaker.changed') {
-          void service.changeSpeaker(runtime, parseSpeaker(control.speaker));
-        }
+        const control = JSON.parse(String(data)) as Record<string, unknown>;
+        ingress.enqueue(() => handleControl(control));
       } catch {
-        // ignore malformed control frames
+        sendAudioMessage({ type: 'processing.error', detail: 'invalid audio control JSON' });
       }
     }
   });
   ws.on('close', () => {
     void relaySupervisor.stop();
   });
-  await done;
+  try {
+    await done;
+  } finally {
+    activeAudioRelays.delete(runtime);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -603,10 +748,12 @@ const isMain =
 
 if (isMain) {
   try {
+    if (existsSync('.env')) loadEnvFile('.env');
     const backend = createBackend();
     const port = Number(process.env.PORT ?? 8000);
-    backend.server.listen(port, () => {
-      console.log(`HormoneRx realtime backend (TypeScript) listening on :${port}`);
+    const host = process.env.HOST ?? '127.0.0.1';
+    backend.server.listen(port, host, () => {
+      console.log(`HormoneRx realtime backend (TypeScript) listening on ${host}:${port}`);
       console.log(
         `evidence: ${JSON.stringify(backend.index.eligibilitySummary().runtimeEligible)} runtime-eligible (pending sign-off override: ${backend.settings.evidence_allow_pending_verification})`,
       );

@@ -194,6 +194,7 @@ export class EncounterService {
       speaker?: Speaker | null;
       sequence?: number | null;
       provider_item_id?: string | null;
+      source_speaker_label?: string | null;
       started_at_ms?: number | null;
       ended_at_ms?: number | null;
     },
@@ -253,6 +254,9 @@ export class EncounterService {
       const turn: TranscriptTurn = {
         turn_id: `turn-${seq}`,
         provider_item_id: args.provider_item_id ?? null,
+        ...(args.source_speaker_label !== undefined
+          ? { source_speaker_label: args.source_speaker_label }
+          : {}),
         sequence: seq,
         speaker,
         text: args.text,

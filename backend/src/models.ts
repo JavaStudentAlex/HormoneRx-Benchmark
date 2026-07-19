@@ -164,6 +164,8 @@ export interface EncounterEvent {
 export interface TranscriptTurn {
   turn_id: string;
   provider_item_id: string | null;
+  /** Original acoustic diarizer label; provenance only, never clinical logic. */
+  source_speaker_label?: string | null;
   sequence: number;
   speaker: Speaker;
   text: string;
