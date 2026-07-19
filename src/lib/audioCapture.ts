@@ -1,5 +1,5 @@
 // Microphone capture for live mode: getUserMedia -> AudioWorklet -> 24 kHz
-// PCM16 mono chunks handed to a callback (streamed to the Python backend, which
+// PCM16 mono chunks handed to a callback (streamed to the backend, which
 // relays them server-side to the transcription provider — no key in the browser).
 //
 // Capture starts ONLY from an explicit user action and every consumer must call

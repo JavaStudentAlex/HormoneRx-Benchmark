@@ -1,34 +1,40 @@
-# Morning Review — HormoneRx v0.2.0 (realtime engine)
+# Morning Review — HormoneRx v0.3.0 (TypeScript end to end)
 
 Everything below was actually run during the build. Do not trust this self-report alone —
 the 5-point spot-check takes ~3 minutes.
 
+**v0.3.0**: the Python (FastAPI) backend was ported 1:1 to TypeScript (Node + Express + ws)
+so the whole project is one language. Same routes, same WS protocol, same JSON wire
+format — the React app is unchanged. The port reproduces all 96 backend tests and
+identical benchmark metrics; the UI was re-verified in a real browser against the
+TypeScript server (15/15 checks, 0 console errors).
+
 ## Exact commands
 
 ```bash
-npm install
-cd backend && uv venv .venv && uv pip install -p .venv/bin/python -r requirements.txt && cd ..
+npm install                 # one install for frontend AND backend
 
-npm run backend             # FastAPI engine on :8000
+npm run backend             # TypeScript engine on :8000 (tsx backend/src/server.ts)
 npm run dev                 # React app on :5173  ->  open http://localhost:5173/#/live
 
-npm run backend:test        # backend pytest suite
+npm run backend:test        # backend Vitest suite (96 tests)
 npm run benchmark:backend   # Layers A+B (+C gate) -> backend/data/benchmark_results.json
-npm run test && npm run typecheck && npm run build   # frontend
+npm run test && npm run typecheck && npm run build   # frontend + backend typecheck
 ```
 
 ## What ran and the result
 
 | Step | Command | Result |
 | --- | --- | --- |
-| Backend tests | `pytest` | **96 passed / 96** (evidence, normalization, context, graph, warning lifecycle, realtime events, API+WS) |
+| Backend tests | `npm run backend:test` | **96 passed / 96** (evidence, normalization, context, graph, warning lifecycle, realtime events, API+WS against a real listening server) |
 | Frontend tests | `vitest run` | **38 passed / 38** |
-| Typecheck | `tsc --noEmit` | **Pass** |
-| Production build | `vite build` | **Success** (285 kB JS / 80 kB gzip) |
-| Benchmark Layer A (text, 24 cases) | `python -m app.benchmark` | **24/24**, trigger P/R/F1 100%, citation coverage 100%, unsupported claims 0 |
+| Typecheck (frontend + backend) | `npm run typecheck` | **Pass** |
+| Production build | `vite build` | **Success** (286 kB JS / 80 kB gzip) |
+| Benchmark Layer A (text, 24 cases) | `npm run benchmark:backend` | **24/24**, trigger P/R/F1 100%, citation coverage 100%, unsupported claims 0 |
 | Benchmark Layer B (streaming, 13 sequences) | same | **13/13**, per-event state accuracy 100%, retraction accuracy 100%, premature warnings 0, duplicate warnings 0 |
 | Benchmark Layer C (audio) | same | **SKIPPED — honestly**: no recordings, no API key. Manifest + gold labels frozen. |
-| End-to-end UI (Playwright, real browser against both servers) | scripted drive of `#/live` | **23/23 checks**, 0 console errors; screenshots `screenshots/desktop-08..10-live-*.png` |
+| End-to-end UI vs TS backend (Playwright, real browser against both servers) | scripted drive of `#/live` | **15/15 checks**, 0 console errors (warning create/retract, conflict notes, proposal lifecycle, Demo 2 replay) |
+| End-to-end UI, v0.2.x runs (Python engine, same wire format) | scripted drive of `#/live` | 23/23 + 5/5 checks; screenshots `screenshots/desktop-08..11-*.png` |
 
 Backend processing latency over the streaming benchmark: median 0.6 ms, p90 ~1 ms per
 turn (deterministic extractor, no network). Live-model latency is **unmeasured**.

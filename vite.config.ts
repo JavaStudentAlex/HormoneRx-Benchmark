@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    // The Python realtime backend (FastAPI) serves /api and /ws on :8000.
+    // The TypeScript realtime backend (Express + ws) serves /api and /ws on :8000.
     proxy: {
       '/api': { target: 'http://localhost:8000', changeOrigin: true },
       '/ws': { target: 'ws://localhost:8000', ws: true },

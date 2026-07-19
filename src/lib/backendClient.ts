@@ -1,4 +1,4 @@
-// Client for the Python realtime backend (REST + WebSocket).
+// Client for the realtime backend (REST + WebSocket).
 // The browser never holds a provider API key: live transcription credentials
 // are minted server-side, and all analysis runs on the backend.
 

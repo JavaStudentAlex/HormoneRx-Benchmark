@@ -39,7 +39,7 @@ correctness · speech-end→final-transcript and final-transcript→UI-result la
 
 ```bash
 cd backend
-OPENAI_API_KEY=… .venv/bin/python -m app.benchmark --layer audio
+OPENAI_API_KEY=… npx tsx backend/src/benchmark.ts --layer audio
 ```
 
 Until recordings exist the command reports SKIPPED; that honest gap is part of the

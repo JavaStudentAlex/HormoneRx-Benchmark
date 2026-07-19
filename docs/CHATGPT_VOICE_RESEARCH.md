@@ -55,7 +55,7 @@ deterministic, source-linked evidence retrieval)?
    `get_evidence_record(id) → verbatim record`. This reuses `EncounterService` directly,
    is the platform's forward path, gives us an app-directory presence, and inherits voice
    support automatically the day OpenAI enables tools in voice mode. Effort: small —
-   the deterministic pipeline is already importable Python; MCP is the same protocol
+   the deterministic pipeline is already an importable TypeScript module; MCP is the same protocol
    family the spec's ecosystem uses.
 2. **Widget-embedded voice inside the app (the community workaround).** Apps SDK widgets
    are iframes; our widget could embed its own mic button and stream to *our* backend

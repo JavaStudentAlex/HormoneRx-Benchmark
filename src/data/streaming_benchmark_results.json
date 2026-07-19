@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "benchmarkVersion": "0.2.0",
+    "benchmarkVersion": "0.3.0",
     "evidenceVersion": "0.2.0",
-    "engine": "hormonerx-backend/0.2.0",
+    "engine": "hormonerx-backend-ts/0.3.0",
     "extractionModel": "deterministic-rule-extractor/0.2.0",
     "mode": "demo-deterministic",
-    "evalTimestamp": "2026-07-19T02:06:18.875616+00:00",
+    "evalTimestamp": "2026-07-19T06:12:07.314Z",
     "deterministic": true,
     "runtimeEligibleRecords": [
       "INT-001",
@@ -29,16 +29,16 @@
       "layer": "A-text",
       "caseCount": 24,
       "metrics": {
-        "passRate": 1.0,
-        "triggerPrecision": 1.0,
-        "triggerRecall": 1.0,
-        "triggerF1": 1.0,
-        "retrievalAccuracy": 1.0,
-        "correctAbstentionRate": 1.0,
-        "negationAccuracy": 1.0,
-        "historicalContextAccuracy": 1.0,
-        "citationCoverage": 1.0,
-        "medicationStatusAccuracy": 1.0,
+        "passRate": 1,
+        "triggerPrecision": 1,
+        "triggerRecall": 1,
+        "triggerF1": 1,
+        "retrievalAccuracy": 1,
+        "correctAbstentionRate": 1,
+        "negationAccuracy": 1,
+        "historicalContextAccuracy": 1,
+        "citationCoverage": 1,
+        "medicationStatusAccuracy": 1,
         "falsePositiveCount": 0,
         "unsupportedClaimCount": 0
       },
@@ -323,15 +323,15 @@
       "layer": "B-streaming",
       "caseCount": 13,
       "metrics": {
-        "casePassRate": 1.0,
-        "perEventStateAccuracy": 1.0,
-        "finalStateAccuracy": 1.0,
-        "retrievalAccuracy": 1.0,
-        "warningRetractionAccuracy": 1.0,
-        "meanRetractionLatencyEvents": 1.0,
+        "casePassRate": 1,
+        "perEventStateAccuracy": 1,
+        "finalStateAccuracy": 1,
+        "retrievalAccuracy": 1,
+        "warningRetractionAccuracy": 1,
+        "meanRetractionLatencyEvents": 1,
         "prematureWarningCount": 0,
         "duplicateWarningCount": 0,
-        "citationCoverage": 1.0,
+        "citationCoverage": 1,
         "unsupportedClaimCount": 0
       },
       "counts": {
@@ -340,9 +340,9 @@
       },
       "processingLatency": {
         "samples": 53,
-        "medianMs": 0.36,
-        "p90Ms": 0.5,
-        "maxMs": 1.02,
+        "medianMs": 0.16,
+        "p90Ms": 0.34,
+        "maxMs": 4.12,
         "note": "Backend pipeline only (final transcript received -> result computed), deterministic extractor, no network. Live-mode model latency is not included and must be measured separately."
       },
       "cases": [

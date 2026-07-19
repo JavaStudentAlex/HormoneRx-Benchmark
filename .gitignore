@@ -17,7 +17,7 @@ project-brief.md
 # Stray local zip export of this project (not part of the source tree)
 zihvsfRw
 
-# Python (backend)
+# Python (kept in case tooling recreates these; backend is TypeScript since v0.3.0)
 __pycache__/
 *.pyc
 .pytest_cache/

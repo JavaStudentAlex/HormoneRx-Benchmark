@@ -1,7 +1,0 @@
-fastapi
-uvicorn[standard]
-pydantic>=2
-httpx
-websockets
-pytest
-pytest-asyncio

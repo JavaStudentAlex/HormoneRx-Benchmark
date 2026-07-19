@@ -5,8 +5,8 @@ How audio becomes a cautious, source-linked evidence result.
 ```text
 Browser microphone
   └─ AudioWorklet → PCM16 mono 24 kHz frames
-       └─ WS /ws/encounters/{id}/audio  (browser → Python; no provider key in the browser)
-            └─ Python relay → provider realtime transcription WS  (server-side OPENAI_API_KEY)
+       └─ WS /ws/encounters/{id}/audio  (browser → backend server; no provider key in the browser)
+            └─ server-side relay → provider realtime transcription WS  (server-side OPENAI_API_KEY)
                  ├─ transcription deltas  → caption.updated (display only, never analyzed)
                  └─ completed turns       → transcript event router
                                               └─ extraction → normalization → event log
@@ -20,7 +20,7 @@ Browser microphone
 - `POST /api/realtime/session` mints an **ephemeral client secret** for the preferred
   browser-WebRTC architecture. The server's standard API key is never returned.
 - The implemented default transport is the spec §7.2 **fallback architecture**: the browser
-  streams PCM16 to our own WebSocket and the Python server holds the provider connection.
+  streams PCM16 to our own WebSocket and the backend server holds the provider connection.
   Secrets stay server-side in both designs.
 - With no `OPENAI_API_KEY` (demo mode) the microphone path is disabled and clearly labeled;
   scripted demo replay, manual turns, and the text tab drive the identical pipeline.

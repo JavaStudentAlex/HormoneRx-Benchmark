@@ -177,7 +177,7 @@ function LiveSession() {
       }
     } catch (err) {
       setBackendDown(true);
-      setErrorBanner('The realtime backend is not reachable. Start it with: cd backend && .venv/bin/uvicorn app.main:app');
+      setErrorBanner('The realtime backend is not reachable. Start it with: npm run backend');
     }
   }
 
@@ -316,8 +316,8 @@ function LiveSession() {
         <CardBody className="space-y-2">
           <Badge tone="danger">Realtime backend not reachable</Badge>
           <p className="text-sm text-navy-soft">
-            The live session needs the Python backend on port 8000. Start it with{' '}
-            <code className="rounded bg-canvas px-1.5 py-0.5 font-mono text-xs">cd backend && .venv/bin/uvicorn app.main:app --port 8000</code>{' '}
+            The live session needs the realtime backend on port 8000. Start it with{' '}
+            <code className="rounded bg-canvas px-1.5 py-0.5 font-mono text-xs">npm run backend</code>{' '}
             and reload this page. The <span className="font-medium">Text analysis</span> tab works without the backend.
           </p>
         </CardBody>
