@@ -1,5 +1,5 @@
 {
-  "datasetVersion": "0.1.0",
+  "datasetVersion": "0.2.0",
   "generatedNote": "Physician-reviewed prototype. All medical content is a close paraphrase of the cited authoritative source. No commercial interaction databases used.",
   "records": [
     {
@@ -8,7 +8,6 @@
       "hormonalSynonyms": [
         "combined oral contraceptive",
         "combined pill",
-        "the pill",
         "COC",
         "CHC",
         "ethinylestradiol-containing contraceptive",
@@ -33,7 +32,17 @@
       "jurisdiction": "United Kingdom",
       "lastVerified": "2026-07-18",
       "physicianVerified": false,
-      "limitations": "Carbamazepine is treated as a representative hepatic enzyme inducer. The magnitude of any reduction in contraceptive effectiveness for an individual is not established. Prototype dataset entry; requires verification against the cited source and individual clinical context."
+      "limitations": "Carbamazepine is treated as a representative hepatic enzyme inducer. The magnitude of any reduction in contraceptive effectiveness for an individual is not established. Prototype dataset entry; requires verification against the cited source and individual clinical context.",
+      "matchType": "specific_pair",
+      "hormonalConceptIds": [
+        "combined_hormonal_contraceptive",
+        "estrogen_containing_oral_contraceptive"
+      ],
+      "interactingConceptIds": [
+        "carbamazepine"
+      ],
+      "interactionDirectionCode": "MEDICATION_AFFECTS_CONTRACEPTIVE",
+      "machineMatchingNotes": "hormonalConceptIds includes estrogen_containing_oral_contraceptive because the record's own synonym list covers ethinylestradiol-containing (estrogen-containing) products. Derived mapping; flagged for physician review."
     },
     {
       "id": "INT-002",
@@ -41,7 +50,6 @@
       "hormonalSynonyms": [
         "combined oral contraceptive",
         "combined pill",
-        "the pill",
         "COC",
         "CHC",
         "ethinylestradiol-containing contraceptive",
@@ -69,7 +77,18 @@
       "jurisdiction": "United Kingdom; United States",
       "lastVerified": "2026-07-18",
       "physicianVerified": false,
-      "limitations": "Two national sources are combined for this record. The CDC classification page (https://www.cdc.gov/contraception/hcp/usspr/classifications-mec-contraception.html) should be confirmed alongside the FSRH guidance. Prototype dataset entry; requires verification against the cited sources and individual clinical context."
+      "limitations": "Two national sources are combined for this record. The CDC classification page (https://www.cdc.gov/contraception/hcp/usspr/classifications-mec-contraception.html) should be confirmed alongside the FSRH guidance. Prototype dataset entry; requires verification against the cited sources and individual clinical context.",
+      "matchType": "any_member",
+      "hormonalConceptIds": [
+        "combined_hormonal_contraceptive",
+        "estrogen_containing_oral_contraceptive"
+      ],
+      "interactingConceptIds": [
+        "rifampicin",
+        "rifabutin"
+      ],
+      "interactionDirectionCode": "MEDICATION_AFFECTS_CONTRACEPTIVE",
+      "machineMatchingNotes": "Multi-member record: matches when the patient medication is any explicit member (rifampicin, rifabutin). hormonalConceptIds derivation as in INT-001."
     },
     {
       "id": "INT-003",
@@ -114,7 +133,21 @@
       "jurisdiction": "United Kingdom",
       "lastVerified": "2026-07-18",
       "physicianVerified": false,
-      "limitations": "The interacting medication is a drug class (hepatic enzyme inducers) rather than a single agent. Prototype dataset entry; requires verification against the cited source and individual clinical context."
+      "limitations": "The interacting medication is a drug class (hepatic enzyme inducers) rather than a single agent. Prototype dataset entry; requires verification against the cited source and individual clinical context.",
+      "matchType": "closed_class",
+      "hormonalConceptIds": [
+        "progestogen_only_pill"
+      ],
+      "interactingConceptIds": [
+        "carbamazepine",
+        "phenytoin",
+        "phenobarbital",
+        "primidone",
+        "rifampicin",
+        "rifabutin"
+      ],
+      "interactionDirectionCode": "MEDICATION_AFFECTS_CONTRACEPTIVE",
+      "machineMatchingNotes": "Closed-class membership is exactly the single agents already enumerated in this record's synonym list. Class words (e.g. 'enzyme inducer') never match by themselves. Members are not extended beyond the record's own enumeration; flagged for physician review."
     },
     {
       "id": "INT-004",
@@ -157,7 +190,21 @@
       "jurisdiction": "United Kingdom",
       "lastVerified": "2026-07-18",
       "physicianVerified": false,
-      "limitations": "The interacting medication is a drug class (hepatic enzyme inducers) rather than a single agent. Prototype dataset entry; requires verification against the cited source and individual clinical context."
+      "limitations": "The interacting medication is a drug class (hepatic enzyme inducers) rather than a single agent. Prototype dataset entry; requires verification against the cited source and individual clinical context.",
+      "matchType": "closed_class",
+      "hormonalConceptIds": [
+        "etonogestrel_implant"
+      ],
+      "interactingConceptIds": [
+        "carbamazepine",
+        "phenytoin",
+        "phenobarbital",
+        "primidone",
+        "rifampicin",
+        "rifabutin"
+      ],
+      "interactionDirectionCode": "MEDICATION_AFFECTS_CONTRACEPTIVE",
+      "machineMatchingNotes": "Closed-class membership is exactly the single agents already enumerated in this record's synonym list. Class words never match by themselves."
     },
     {
       "id": "INT-005",
@@ -165,7 +212,6 @@
       "hormonalSynonyms": [
         "combined oral contraceptive",
         "combined pill",
-        "the pill",
         "COC",
         "estrogen-containing contraceptive",
         "ethinylestradiol-containing oral contraceptive"
@@ -188,7 +234,17 @@
       "jurisdiction": "United States; United Kingdom",
       "lastVerified": "2026-07-18",
       "physicianVerified": false,
-      "limitations": "REVERSED DIRECTION relative to the other records: the concern is reduced lamotrigine exposure (seizure-control risk), not reduced contraceptive efficacy. The record deliberately carries no dose recommendation. Prototype dataset entry; requires verification against the cited sources and individual clinical context."
+      "limitations": "REVERSED DIRECTION relative to the other records: the concern is reduced lamotrigine exposure (seizure-control risk), not reduced contraceptive efficacy. The record deliberately carries no dose recommendation. Prototype dataset entry; requires verification against the cited sources and individual clinical context.",
+      "matchType": "specific_pair",
+      "hormonalConceptIds": [
+        "estrogen_containing_oral_contraceptive",
+        "combined_hormonal_contraceptive"
+      ],
+      "interactingConceptIds": [
+        "lamotrigine"
+      ],
+      "interactionDirectionCode": "CONTRACEPTIVE_AFFECTS_MEDICATION",
+      "machineMatchingNotes": "REVERSED direction: the contraceptive reduces lamotrigine exposure. hormonalConceptIds includes combined_hormonal_contraceptive because the record's own synonym list covers combined oral contraceptives (estrogen-containing). Derived mapping; flagged for physician review."
     },
     {
       "id": "INT-006",
@@ -235,7 +291,35 @@
       "jurisdiction": "United Kingdom",
       "lastVerified": "2026-07-18",
       "physicianVerified": false,
-      "limitations": "The source also carries dose and alternative-method advice (e.g. copper IUD, doubling the levonorgestrel dose); that directive content is deliberately excluded here to keep potentialConsequence non-directive. Prototype dataset entry; requires verification against the cited source and individual clinical context."
+      "limitations": "The source also carries dose and alternative-method advice (e.g. copper IUD, doubling the levonorgestrel dose); that directive content is deliberately excluded here to keep potentialConsequence non-directive. Prototype dataset entry; requires verification against the cited source and individual clinical context.",
+      "matchType": "closed_class",
+      "hormonalConceptIds": [
+        "levonorgestrel_emergency_contraception"
+      ],
+      "interactingConceptIds": [
+        "carbamazepine",
+        "phenytoin",
+        "primidone",
+        "rifampicin",
+        "rifabutin",
+        "efavirenz",
+        "st_johns_wort",
+        "griseofulvin"
+      ],
+      "interactionDirectionCode": "MEDICATION_AFFECTS_CONTRACEPTIVE",
+      "machineMatchingNotes": "Closed-class membership is exactly the single agents enumerated in this record's synonym list. The class word 'barbiturates' is NOT expanded to members (phenobarbital is deliberately absent here because this record's list does not name it); pending physician enumeration."
+    }
+  ],
+  "changelog": [
+    {
+      "version": "0.2.0",
+      "date": "2026-07-19",
+      "changes": [
+        "Added machine-matching metadata per task spec §22: matchType, hormonalConceptIds, interactingConceptIds (explicit closed-class membership), interactionDirectionCode, machineMatchingNotes.",
+        "Removed the bare alias 'the pill' from hormonalSynonyms (INT-001, INT-002, INT-005); it is now an ambiguous hormonal reference handled by abstention per task spec §15.7.",
+        "No medical prose field (interactionDirection, potentialConsequence, clinicianConsideration, evidenceLevel, population, source*, jurisdiction, limitations) was altered.",
+        "physicianVerified remains false on all records: sign-off is pending and is the physician's claim to make. Runtime eligibility is computed at load time and never stored."
+      ]
     }
   ]
 }

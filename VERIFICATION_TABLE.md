@@ -23,3 +23,29 @@ One row per evidence record. Confirm each direction is medically correct and no 
 - [ ] INT-006 non-directive (no dose/IUD advice) → set `true`
 
 If out of time, leave any record `false` and label the dataset "physician-reviewed, source-verification pending." After editing, re-run `npm run test` (schema test asserts any `physicianVerified: true` record still cites a real section).
+
+---
+
+# Addendum v0.2.0 — machine-matching metadata to review
+
+`backend/data/evidence_records.json` (now the single canonical evidence file) added
+machine-matching fields. **Medical prose is byte-identical to v0.1.0** (verified by
+script and by `backend/tests/test_evidence.py::test_medical_prose_identical_to_v1`).
+Please review the derivations below together with the direction sign-off above.
+
+| Record | matchType | Applies to hormonal concepts | Explicit interacting members | Review question |
+|---|---|---|---|---|
+| INT-001 | specific_pair | combined_hormonal_contraceptive, **estrogen_containing_oral_contraceptive** | carbamazepine | Derived: record synonyms include "ethinylestradiol-containing contraceptive" — OK to match estrogen-containing OCs? |
+| INT-002 | any_member | same as INT-001 | rifampicin, rifabutin | Same derived hormonal mapping. |
+| INT-003 | closed_class | progestogen_only_pill | carbamazepine, phenytoin, phenobarbital, primidone, rifampicin, rifabutin | Members = exactly the agents already enumerated in the record's synonym list; nothing added. |
+| INT-004 | closed_class | etonogestrel_implant | same six as INT-003 | Same rule. |
+| INT-005 | specific_pair | estrogen_containing_oral_contraceptive, **combined_hormonal_contraceptive** | lamotrigine | Derived: record synonyms include "combined oral contraceptive". Direction stays REVERSED. |
+| INT-006 | closed_class | levonorgestrel_emergency_contraception | carbamazepine, phenytoin, primidone, rifampicin, rifabutin, efavirenz, st_johns_wort, griseofulvin | "barbiturates" (class word) NOT expanded — phenobarbital deliberately absent because this record's list does not name it. Enumerate if desired. |
+
+Also changed: the bare alias **"the pill"** was removed from synonym lists and is now an
+ambiguous reference that abstains (task spec §15.7) — confirm you agree it must never
+auto-resolve to the combined pill.
+
+- [ ] Derived hormonal-concept mappings approved (INT-001/002/005)
+- [ ] Closed-class member lists approved (INT-003/004/006)
+- [ ] "the pill" ambiguity behavior approved

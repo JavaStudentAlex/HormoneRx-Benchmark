@@ -44,3 +44,22 @@ All visible medical content comes only from `src/data/evidence_records.json`. Th
 ## Out of scope (not built, by design)
 
 Patient accounts, EHR, dosing tools, treatment recommendations, diagnosis, comprehensive drug coverage, and autonomous prescribing.
+
+## Realtime additions (v0.2.0)
+
+- **Partials never warn.** Only finalized transcript turns reach extraction; provisional
+  captions are display-only (spec §7.4, tested in `backend/tests/test_realtime_events.py`).
+- **Warnings are derived graph objects.** Created only from a deterministic pair match over
+  active, patient-attributed, normalized assertions; every warning exposes a provenance
+  chain (record → trigger assertions → source turns) and is **visibly retracted with a
+  reason** when context changes — never silently removed.
+- **Ambiguity abstains.** Bare "the pill", class words, unknown names, unknown subjects,
+  and unresolved contradictions produce `MORE_INFORMATION_REQUIRED`/`EXCLUDED_CONTEXT`,
+  never a guessed match.
+- **Physician sign-off gate.** Runtime eligibility requires `physicianVerified: true`.
+  All six records are currently **pending sign-off**, so the development/demo default
+  (`EVIDENCE_ALLOW_PENDING_VERIFICATION=true`, forced off in production) allows records
+  that pass every *other* check to warn, and every such warning card carries a red
+  **"physician sign-off pending"** badge instead of the verified badge. Flip the flags in
+  `backend/data/evidence_records.json` after review (see `VERIFICATION_TABLE.md`) and the
+  override becomes irrelevant. No unverified content is ever presented as verified.

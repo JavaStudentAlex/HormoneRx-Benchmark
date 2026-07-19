@@ -1,0 +1,756 @@
+{
+  "metadata": {
+    "benchmarkVersion": "0.2.0",
+    "evidenceVersion": "0.2.0",
+    "engine": "hormonerx-backend/0.2.0",
+    "extractionModel": "deterministic-rule-extractor/0.2.0",
+    "mode": "demo-deterministic",
+    "evalTimestamp": "2026-07-19T01:45:05.304169+00:00",
+    "deterministic": true,
+    "runtimeEligibleRecords": [
+      "INT-001",
+      "INT-002",
+      "INT-003",
+      "INT-004",
+      "INT-005",
+      "INT-006"
+    ],
+    "pendingPhysicianSignOff": [
+      "INT-001",
+      "INT-002",
+      "INT-003",
+      "INT-004",
+      "INT-005",
+      "INT-006"
+    ]
+  },
+  "layers": {
+    "text": {
+      "layer": "A-text",
+      "caseCount": 23,
+      "metrics": {
+        "passRate": 1.0,
+        "triggerPrecision": 1.0,
+        "triggerRecall": 1.0,
+        "triggerF1": 1.0,
+        "retrievalAccuracy": 1.0,
+        "correctAbstentionRate": 1.0,
+        "negationAccuracy": 1.0,
+        "historicalContextAccuracy": 1.0,
+        "citationCoverage": 1.0,
+        "medicationStatusAccuracy": 1.0,
+        "falsePositiveCount": 0,
+        "unsupportedClaimCount": 0
+      },
+      "confusion": {
+        "truePositive": 10,
+        "falsePositive": 0,
+        "falseNegative": 0,
+        "trueNegative": 13
+      },
+      "counts": {
+        "passCount": 23,
+        "total": 23
+      },
+      "cases": [
+        {
+          "id": "CASE-001",
+          "category": "clear_positive",
+          "input": "The patient currently uses the combined pill and takes carbamazepine.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-001",
+          "actualEvidenceRecordId": "INT-001",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-001)."
+        },
+        {
+          "id": "CASE-002",
+          "category": "clear_positive",
+          "input": "She is being treated with rifampicin for tuberculosis and uses a combined oral contraceptive.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-002",
+          "actualEvidenceRecordId": "INT-002",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-002)."
+        },
+        {
+          "id": "CASE-003",
+          "category": "clear_positive",
+          "input": "The patient takes amlodipine, ramipril and carbamazepine daily, and uses a combined oral contraceptive.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-001",
+          "actualEvidenceRecordId": "INT-001",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-001)."
+        },
+        {
+          "id": "CASE-004",
+          "category": "clear_positive",
+          "input": "She has the etonogestrel implant and takes carbamazepine for epilepsy.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-004",
+          "actualEvidenceRecordId": "INT-004",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-004)."
+        },
+        {
+          "id": "CASE-005",
+          "category": "clear_positive",
+          "input": "She has requested the morning-after pill and is currently taking rifampicin.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-006",
+          "actualEvidenceRecordId": "INT-006",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-006)."
+        },
+        {
+          "id": "CASE-006",
+          "category": "implicit_positive",
+          "input": "She uses Nexplanon and takes Tegretol.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-004",
+          "actualEvidenceRecordId": "INT-004",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-004)."
+        },
+        {
+          "id": "CASE-007",
+          "category": "implicit_positive",
+          "input": "She takes lamotrigine for epilepsy and has just started a combined oral contraceptive.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-005",
+          "actualEvidenceRecordId": "INT-005",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-005)."
+        },
+        {
+          "id": "CASE-008",
+          "category": "implicit_positive",
+          "input": "She uses a combined oral contraceptive and takes carbamazapine daily.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-001",
+          "actualEvidenceRecordId": "INT-001",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-001)."
+        },
+        {
+          "id": "CASE-009",
+          "category": "true_negative",
+          "input": "She uses a combined oral contraceptive and takes paracetamol occasionally.",
+          "expectedResultState": "NO_VALIDATED_MATCH",
+          "actualResultState": "NO_VALIDATED_MATCH",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "The medication context is clear but no record in the prototype evidence dataset matches this combination."
+        },
+        {
+          "id": "CASE-010",
+          "category": "true_negative",
+          "input": "She takes the progestogen-only pill and uses ibuprofen for headaches.",
+          "expectedResultState": "NO_VALIDATED_MATCH",
+          "actualResultState": "NO_VALIDATED_MATCH",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "The medication context is clear but no record in the prototype evidence dataset matches this combination."
+        },
+        {
+          "id": "CASE-011",
+          "category": "true_negative",
+          "input": "He takes sertraline and uses a combined oral contraceptive.",
+          "expectedResultState": "NO_VALIDATED_MATCH",
+          "actualResultState": "NO_VALIDATED_MATCH",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "The medication context is clear but no record in the prototype evidence dataset matches this combination."
+        },
+        {
+          "id": "CASE-012",
+          "category": "explicit_negation",
+          "input": "She uses a combined oral contraceptive but is not taking carbamazepine.",
+          "expectedResultState": "EXCLUDED_CONTEXT",
+          "actualResultState": "EXCLUDED_CONTEXT",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "A relevant-sounding mention is excluded from matching by its context."
+        },
+        {
+          "id": "CASE-013",
+          "category": "explicit_negation",
+          "input": "She has the etonogestrel implant and denies any use of rifampicin or other enzyme inducers.",
+          "expectedResultState": "EXCLUDED_CONTEXT",
+          "actualResultState": "EXCLUDED_CONTEXT",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "A relevant-sounding mention is excluded from matching by its context."
+        },
+        {
+          "id": "CASE-014",
+          "category": "explicit_negation",
+          "input": "She uses the combined pill. Her partner takes carbamazepine.",
+          "expectedResultState": "EXCLUDED_CONTEXT",
+          "actualResultState": "EXCLUDED_CONTEXT",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "A relevant-sounding mention is excluded from matching by its context."
+        },
+        {
+          "id": "CASE-015",
+          "category": "historical_use",
+          "input": "She stopped carbamazepine last year and currently uses a combined oral contraceptive.",
+          "expectedResultState": "EXCLUDED_CONTEXT",
+          "actualResultState": "EXCLUDED_CONTEXT",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "A relevant-sounding mention is excluded from matching by its context."
+        },
+        {
+          "id": "CASE-016",
+          "category": "historical_use",
+          "input": "She used rifampicin during treatment two years ago; she now uses the progestogen-only pill.",
+          "expectedResultState": "EXCLUDED_CONTEXT",
+          "actualResultState": "EXCLUDED_CONTEXT",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "A relevant-sounding mention is excluded from matching by its context."
+        },
+        {
+          "id": "CASE-017",
+          "category": "ambiguous_missing",
+          "input": "She takes carbamazepine and says she uses contraception, but the method is unclear.",
+          "expectedResultState": "MORE_INFORMATION_REQUIRED",
+          "actualResultState": "MORE_INFORMATION_REQUIRED",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "The encounter graph does not yet contain enough unambiguous context for a deterministic lookup."
+        },
+        {
+          "id": "CASE-018",
+          "category": "ambiguous_missing",
+          "input": "She uses a combined oral contraceptive and is planning to start carbamazepine next month.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-001",
+          "actualEvidenceRecordId": "INT-001",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-001)."
+        },
+        {
+          "id": "CASE-019",
+          "category": "ambiguous_missing",
+          "input": "She takes carbamazepine and might be using some form of hormonal contraception.",
+          "expectedResultState": "MORE_INFORMATION_REQUIRED",
+          "actualResultState": "MORE_INFORMATION_REQUIRED",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "The encounter graph does not yet contain enough unambiguous context for a deterministic lookup."
+        },
+        {
+          "id": "CASE-020",
+          "category": "ambiguous_missing",
+          "input": "She uses a combined oral contraceptive and takes something for her epilepsy but cannot recall the name.",
+          "expectedResultState": "MORE_INFORMATION_REQUIRED",
+          "actualResultState": "MORE_INFORMATION_REQUIRED",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "The encounter graph does not yet contain enough unambiguous context for a deterministic lookup."
+        },
+        {
+          "id": "CASE-021",
+          "category": "ambiguous_missing",
+          "input": "She takes carbamazepine and uses the pill.",
+          "expectedResultState": "MORE_INFORMATION_REQUIRED",
+          "actualResultState": "MORE_INFORMATION_REQUIRED",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "The encounter graph does not yet contain enough unambiguous context for a deterministic lookup."
+        },
+        {
+          "id": "CASE-022",
+          "category": "clear_positive",
+          "input": "She has requested the morning-after pill and takes St John's wort daily.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-006",
+          "actualEvidenceRecordId": "INT-006",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-006)."
+        },
+        {
+          "id": "CASE-023",
+          "category": "excluded_discussion",
+          "input": "The doctor explained what carbamazepine is. She uses the combined pill.",
+          "expectedResultState": "EXCLUDED_CONTEXT",
+          "actualResultState": "EXCLUDED_CONTEXT",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "pass": true,
+          "lookupReason": "A relevant-sounding mention is excluded from matching by its context."
+        }
+      ]
+    },
+    "streaming": {
+      "layer": "B-streaming",
+      "caseCount": 10,
+      "metrics": {
+        "casePassRate": 1.0,
+        "perEventStateAccuracy": 1.0,
+        "finalStateAccuracy": 1.0,
+        "retrievalAccuracy": 1.0,
+        "warningRetractionAccuracy": 1.0,
+        "meanRetractionLatencyEvents": 1.0,
+        "prematureWarningCount": 0,
+        "duplicateWarningCount": 0,
+        "citationCoverage": 1.0,
+        "unsupportedClaimCount": 0
+      },
+      "counts": {
+        "events": 26,
+        "eventsCorrect": 26
+      },
+      "processingLatency": {
+        "samples": 45,
+        "medianMs": 0.34,
+        "p90Ms": 0.43,
+        "maxMs": 0.88,
+        "note": "Backend pipeline only (final transcript received -> result computed), deterministic extractor, no network. Live-mode model latency is not included and must be measured separately."
+      },
+      "cases": [
+        {
+          "id": "STREAM-001",
+          "category": "context_completed_over_turns",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "MORE_INFORMATION_REQUIRED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "MORE_INFORMATION_REQUIRED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 3,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-002",
+          "category": "positive_later_negated",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "RETRACTED",
+                "EXCLUDED_CONTEXT"
+              ],
+              "actualResultState": "RETRACTED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-003",
+          "category": "positive_later_historicized",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "MORE_INFORMATION_REQUIRED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            },
+            {
+              "sequence": 3,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "RETRACTED",
+                "EXCLUDED_CONTEXT"
+              ],
+              "actualResultState": "RETRACTED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-004",
+          "category": "wrong_medication_corrected",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-005"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-005"
+              ],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-005",
+          "category": "other_person_then_clarified",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "MORE_INFORMATION_REQUIRED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EXCLUDED_CONTEXT"
+              ],
+              "actualResultState": "EXCLUDED_CONTEXT",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 3,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-006",
+          "category": "proposed_prescription_added",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "MORE_INFORMATION_REQUIRED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "prescription.proposed",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-005"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-005"
+              ],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-007",
+          "category": "proposed_prescription_cancelled",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "MORE_INFORMATION_REQUIRED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "prescription.proposed",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            },
+            {
+              "sequence": 3,
+              "type": "prescription.cancelled",
+              "expectedResultStates": [
+                "RETRACTED",
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "RETRACTED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-008",
+          "category": "ambiguity_resolved_later",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "MORE_INFORMATION_REQUIRED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "MORE_INFORMATION_REQUIRED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 3,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-009",
+          "category": "late_out_of_order_event",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "MORE_INFORMATION_REQUIRED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 3,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "RETRACTED",
+                "EXCLUDED_CONTEXT"
+              ],
+              "actualResultState": "RETRACTED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-010",
+          "category": "duplicate_event_replay",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            },
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            }
+          ]
+        }
+      ]
+    },
+    "audio": {
+      "layer": "C-audio",
+      "status": "SKIPPED",
+      "reason": "6 audio files not recorded yet; no OPENAI_API_KEY for live transcription",
+      "caseCount": 6,
+      "note": "Results are only reported for runs that actually happened. Record the manifest audio and set OPENAI_API_KEY to execute this layer."
+    }
+  }
+}

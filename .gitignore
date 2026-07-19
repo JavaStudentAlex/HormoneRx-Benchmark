@@ -16,3 +16,9 @@ project-brief.md
 
 # Stray local zip export of this project (not part of the source tree)
 zihvsfRw
+
+# Python (backend)
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/.venv/

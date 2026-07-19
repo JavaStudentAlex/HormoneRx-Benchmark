@@ -1,76 +1,82 @@
-# Morning Review — HormoneRx Benchmark
+# Morning Review — HormoneRx v0.2.0 (realtime engine)
 
-Everything below was actually run overnight. Do not trust this self-report alone — verify at least the positive-case retrieval and one metric yourself (steps in "Your 5-point spot-check").
+Everything below was actually run during the build. Do not trust this self-report alone —
+the 5-point spot-check takes ~3 minutes.
 
 ## Exact commands
 
 ```bash
-# from the project root
-npm install            # first time only
-npm run dev            # start the app -> http://localhost:5173  (Demo mode, no API key)
+npm install
+cd backend && uv venv .venv && uv pip install -p .venv/bin/python -r requirements.txt && cd ..
 
-npm run benchmark      # regenerate src/data/benchmark_results.json
-npm run test           # 38 unit + integration tests
-npm run typecheck      # tsc --noEmit
-npm run build          # production build
+npm run backend             # FastAPI engine on :8000
+npm run dev                 # React app on :5173  ->  open http://localhost:5173/#/live
+
+npm run backend:test        # backend pytest suite
+npm run benchmark:backend   # Layers A+B (+C gate) -> backend/data/benchmark_results.json
+npm run test && npm run typecheck && npm run build   # frontend
 ```
 
 ## What ran and the result
 
 | Step | Command | Result |
 | --- | --- | --- |
-| Typecheck | `npx tsc --noEmit` | **Pass** (no errors) |
-| Tests | `npx vitest run` | **38 passed / 38** (4 files: schema, extract, pipeline, export) |
-| Benchmark | `npx tsx scripts/run_benchmark.ts` | **20/20 pass** |
-| Production build | `npx vite build` | **Success** (243 kB JS / 14 kB CSS) |
-| E2E + screenshots | `node scripts/e2e_screenshots.mjs` (Playwright/Chromium) | **15/15 checks passed, 0 console errors**; desktop + mobile screenshots in `screenshots/` |
+| Backend tests | `pytest` | **91 passed / 91** (evidence, normalization, context, graph, warning lifecycle, realtime events, API+WS) |
+| Frontend tests | `vitest run` | **38 passed / 38** |
+| Typecheck | `tsc --noEmit` | **Pass** |
+| Production build | `vite build` | **Success** (285 kB JS / 80 kB gzip) |
+| Benchmark Layer A (text, 23 cases) | `python -m app.benchmark` | **23/23**, trigger P/R/F1 100%, citation coverage 100%, unsupported claims 0 |
+| Benchmark Layer B (streaming, 10 sequences) | same | **10/10**, per-event state accuracy 100%, retraction accuracy 100%, premature warnings 0, duplicate warnings 0 |
+| Benchmark Layer C (audio) | same | **SKIPPED — honestly**: no recordings, no API key. Manifest + gold labels frozen. |
+| End-to-end UI (Playwright, real browser against both servers) | scripted drive of `#/live` | **23/23 checks**, 0 console errors; screenshots `screenshots/desktop-08..10-live-*.png` |
 
-## Benchmark metrics (from `src/data/benchmark_results.json`)
+Backend processing latency over the streaming benchmark: median 0.6 ms, p90 ~1 ms per
+turn (deterministic extractor, no network). Live-model latency is **unmeasured**.
 
-| Metric | Value |
-| --- | --- |
-| Trigger precision / recall / F1 | 100% / 100% / 100% |
-| Retrieval accuracy | 100% |
-| Correct abstention rate | 100% |
-| Negation accuracy | 100% |
-| Historical-context accuracy | 100% |
-| Citation coverage | 100% |
-| Entity precision / recall | 100% / 100% |
-| False-positive count | 0 |
-| Unsupported-claim count | 0 |
-| Pass rate | 100% (20/20) |
-| Metadata | mode: demo · model: deterministic-demo-extractor · seed 42 · deterministic |
+## What was verified end-to-end in the browser
 
-Note: 100% reflects the **deterministic demo pipeline** on synthetic cases written in the dataset's vocabulary — it validates harness consistency, not clinical accuracy. See `docs/EVALUATION.md`.
+1. Consent notice before capture; listening starts only on explicit action; red
+   recording indicator + session duration; stop/clear work.
+2. Demo 2 script: captions stream as provisional; the INT-001 warning appears **only**
+   after the pair completes; the correction turn flips it to **RETRACTED** with the
+   reason and the correcting turn shown; the superseded assertion is in the audit drawer.
+3. Proposal flow: current combined pill + proposed lamotrigine → proposed-context
+   INT-005 warning (reversed direction); cancel → visible retraction.
+4. Speaker shortcuts D/P; `/analyze` redirects to the text tab; the text tab works with
+   the backend stopped.
 
-## The exact 3-case demo sequence (Analyze Case → sample buttons)
+## NOT verified (be aware before the live demo)
 
-1. **Positive** — "The patient currently takes a combined oral contraceptive and carbamazepine." → **EVIDENCE_FOUND**, record **INT-001**, FSRH source shown.
-2. **Negated** — "She uses a combined oral contraceptive but is not taking carbamazepine." → **EXCLUDED_CONTEXT**, no record, no alert.
-3. **Ambiguous** — "She takes carbamazepine and says she uses contraception, but the method is unclear." → **MORE_INFORMATION_REQUIRED**, missing info listed.
+- **Live microphone → provider transcription.** Implemented (ephemeral-credential
+  endpoint + server-side relay + browser capture) but never exercised against the real
+  API — no key in the build environment. Smoke-test with a key before demoing live mode;
+  the fallback demo scripts do not depend on it.
+- **Layer C audio benchmark** — not executed (see above).
+- `TRANSCRIPTION_MODEL=gpt-realtime-whisper` comes from the task spec and is env-configurable;
+  confirm the model name against current provider docs when you first run live mode.
 
-## Your 5-point spot-check (don't skip)
+## Records still needing your sign-off (physicianVerified: false — all six)
 
-1. Positive case retrieves **INT-001** with the FSRH link. ✔ verify on screen.
-2. Negated case produces **no** alert (EXCLUDED_CONTEXT). ✔
-3. Ambiguous case **abstains** (MORE_INFORMATION_REQUIRED). ✔
-4. Records still match what you approve — see `VERIFICATION_TABLE.md`.
-5. A UI metric matches the file: open **Benchmark**, confirm e.g. "Correct abstention 100%" equals `benchmark_results.json` → `metrics.correctAbstentionRate`.
+Unchanged medical prose from v0.1.0 (byte-identical, asserted by a test). New for your
+review in `VERIFICATION_TABLE.md` addendum: derived hormonal-concept mappings
+(INT-001/002/005), closed-class member lists (INT-003/004/006), and the new
+"the pill = ambiguous, always abstain" behavior.
 
-## Records still needing your sign-off (physicianVerified: false)
+Until you flip the flags, the demo runs under `EVIDENCE_ALLOW_PENDING_VERIFICATION=true`
+(development only, forced off in production) and **every warning carries a red
+"physician sign-off pending" badge**. After sign-off, restart the backend and the badge
+switches to physician-verified with no other change.
 
-**All six** (INT-001 … INT-006). Each has **zero `[VERIFY]` fields** and cites a real, checkable section, so all six meet the criteria for attestation — they were left `false` so the physician claim is yours to make, not the agent's. Flip approved rows to `true` in `src/data/evidence_records.json` (see `VERIFICATION_TABLE.md`), then re-run `npm run test`.
+## Your 5-point spot-check
 
-Two things to catch specifically:
-- **INT-005 (lamotrigine)** must be the **reversed** direction (contraceptive lowers lamotrigine → seizure-control risk), not the contraceptive losing efficacy. Confirmed reversed in the data and asserted by a test.
-- **INT-006 (levonorgestrel EC)** must stay **non-directive** — no dose/copper-IUD advice in `potentialConsequence`. Confirmed excluded and asserted by a test.
+1. Open `#/live`, play **Demo 2** → warning after turn 4, retracted with reason after turn 5. ✔ on screen.
+2. Play **Demo 4** ("the pill") → abstains with the missing-method question, no warning.
+3. Play **Demo 5** (sister) → no patient warning; sister's carbamazepine under "Other subjects".
+4. Open **Benchmark** page → "Realtime backend benchmark" stats match `backend/data/benchmark_results.json`.
+5. `VERIFICATION_TABLE.md` addendum: approve or amend the derived mappings, then flip flags + `npm run backend:test`.
 
-## Unresolved issues / notes
+## Demo sequence for the presentation
 
-- **`dist/` from an earlier build cannot be deleted** on this synced folder (a filesystem permission quirk); it is gitignored and irrelevant. `npm run build` regenerates a fresh bundle locally without issue.
-- **Live mode** needs a deployed `/api/extract` (see `api/extract.example.ts` and `.env.example`). Demo mode is fully offline and is what the benchmark evaluates.
-- Screenshots for review: `screenshots/desktop-0{1..7}-*.png` and `screenshots/mobile-0{1..3}-*.png`.
-
-## Scope confirmation
-
-Four sections + About only (Overview, Analyze Case, Evidence Library, Benchmark, About). No mcPHASES / NHANES / menstrual-cycle / population-survey pages. No patient accounts, EHR, dosing tools, diagnosis, or prescribing.
+Demo 1 (incremental match) → Demo 2 (correction/retraction — the money shot) →
+proposal + cancel via the UI → Demo 4 (ambiguity abstains) → Benchmark page →
+Export audit JSON to show full provenance.

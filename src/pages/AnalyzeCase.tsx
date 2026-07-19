@@ -7,7 +7,7 @@ import EvidenceRecordView from '../components/EvidenceRecordView';
 
 const demoCases = getDemoCases();
 
-export default function AnalyzeCase() {
+export default function AnalyzeCase({ embedded = false }: { embedded?: boolean }) {
   const { mode } = useMode();
   const [text, setText] = useState('');
   const [result, setResult] = useState<PipelineResult | null>(null);
@@ -39,10 +39,15 @@ export default function AnalyzeCase() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-navy">Analyze Case</h1>
+        {embedded ? (
+          <h2 className="text-lg font-semibold tracking-tight text-navy">Text case analysis</h2>
+        ) : (
+          <h1 className="text-2xl font-semibold tracking-tight text-navy">Analyze Case</h1>
+        )}
         <p className="mt-2 max-w-3xl text-sm text-navy-soft">
           Paste a synthetic consultation snippet, or load one of the five scripted sample cases. The model extracts
           only structured context; the result is produced by deterministic lookup in the evidence dataset.
+          {embedded && ' This tab works fully offline — no backend or API key needed.'}
         </p>
         <div className="mt-2">
           <Badge tone={mode === 'demo' ? 'teal' : 'amber'}>{mode === 'demo' ? 'Demo mode (no API key required)' : 'Live mode (server-side model)'}</Badge>

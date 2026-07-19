@@ -30,7 +30,7 @@ export default function EvidenceLibrary() {
         <h1 className="text-2xl font-semibold tracking-tight text-navy">Evidence Library</h1>
         <p className="mt-2 max-w-3xl text-sm text-navy-soft">
           The curated, source-linked evidence dataset. Records are read-only in the app; the file
-          <span className="font-mono text-xs"> src/data/evidence_records.json </span>
+          <span className="font-mono text-xs"> backend/data/evidence_records.json </span>
           is the single source of truth.
         </p>
         <p className="mt-2 max-w-3xl rounded-lg border border-amber/30 bg-amber/10 p-3 text-sm text-navy-soft">

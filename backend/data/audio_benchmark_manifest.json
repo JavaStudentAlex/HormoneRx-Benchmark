@@ -1,0 +1,90 @@
+{
+  "benchmarkVersion": "0.2.0",
+  "layer": "C-audio",
+  "status": "manifest_and_gold_labels_only",
+  "note": "Audio benchmark manifest (spec §25.3). Gold labels are frozen here; the audio files must be recorded by consenting team members or generated with a TTS voice (synthetic speech only, never real patient audio) into backend/data/audio/ using the listed file names. Executing this layer requires live transcription (OPENAI_API_KEY) and was NOT run in the build environment — see MORNING_REVIEW.md. Run: python -m app.benchmark --layer audio",
+  "recording_guidance": {
+    "format": "wav, 16-bit PCM, mono, 16 kHz or higher",
+    "conditions_to_cover": ["quiet room", "moderate background noise", "faster speaking rate", "brand names", "generic names", "spelling clarification", "interruption and correction", "negation"],
+    "consent": "Only consenting team members or synthetic voices. No real patient audio."
+  },
+  "cases": [
+    {
+      "id": "AUDIO-001",
+      "file": "audio/audio-001-quiet-positive.wav",
+      "condition": "quiet room, natural pace",
+      "referenceTranscript": [
+        { "speaker": "doctor", "text": "Are you currently taking any regular medication?" },
+        { "speaker": "patient", "text": "Yes, I take Tegretol." },
+        { "speaker": "doctor", "text": "Are you using hormonal contraception?" },
+        { "speaker": "patient", "text": "Yes, I use the combined pill." }
+      ],
+      "criticalEntities": ["Tegretol", "combined pill"],
+      "expectedFinalState": "EVIDENCE_FOUND",
+      "expectedEvidenceRecordId": "INT-001",
+      "expectedWarningLifecycle": ["created"]
+    },
+    {
+      "id": "AUDIO-002",
+      "file": "audio/audio-002-correction.wav",
+      "condition": "quiet room, self-correction",
+      "referenceTranscript": [
+        { "speaker": "patient", "text": "I use the combined pill and take Tegretol." },
+        { "speaker": "patient", "text": "Sorry, I stopped Tegretol last year." }
+      ],
+      "criticalEntities": ["Tegretol", "combined pill", "stopped", "last year"],
+      "expectedFinalState": ["RETRACTED", "EXCLUDED_CONTEXT"],
+      "expectedEvidenceRecordId": null,
+      "expectedWarningLifecycle": ["created", "retracted"]
+    },
+    {
+      "id": "AUDIO-003",
+      "file": "audio/audio-003-negation-noise.wav",
+      "condition": "moderate background noise, negation",
+      "referenceTranscript": [
+        { "speaker": "patient", "text": "I use the combined pill but I am not taking carbamazepine." }
+      ],
+      "criticalEntities": ["combined pill", "not taking", "carbamazepine"],
+      "expectedFinalState": "EXCLUDED_CONTEXT",
+      "expectedEvidenceRecordId": null,
+      "expectedWarningLifecycle": []
+    },
+    {
+      "id": "AUDIO-004",
+      "file": "audio/audio-004-brand-vs-generic.wav",
+      "condition": "brand name and spelling clarification",
+      "referenceTranscript": [
+        { "speaker": "patient", "text": "I take Lamictal — that is L-A-M-I-C-T-A-L — and use an estrogen-containing pill." }
+      ],
+      "criticalEntities": ["Lamictal", "estrogen-containing pill"],
+      "expectedFinalState": "EVIDENCE_FOUND",
+      "expectedEvidenceRecordId": "INT-005",
+      "expectedWarningLifecycle": ["created"]
+    },
+    {
+      "id": "AUDIO-005",
+      "file": "audio/audio-005-fast-ambiguous.wav",
+      "condition": "faster speaking rate, ambiguous method",
+      "referenceTranscript": [
+        { "speaker": "patient", "text": "I take carbamazepine and use the pill." }
+      ],
+      "criticalEntities": ["carbamazepine", "the pill"],
+      "expectedFinalState": "MORE_INFORMATION_REQUIRED",
+      "expectedEvidenceRecordId": null,
+      "expectedWarningLifecycle": []
+    },
+    {
+      "id": "AUDIO-006",
+      "file": "audio/audio-006-other-person-interrupt.wav",
+      "condition": "interruption, other-person attribution",
+      "referenceTranscript": [
+        { "speaker": "patient", "text": "My sister takes carbamazepine." },
+        { "speaker": "patient", "text": "I use the combined pill." }
+      ],
+      "criticalEntities": ["my sister", "carbamazepine", "combined pill"],
+      "expectedFinalState": "EXCLUDED_CONTEXT",
+      "expectedEvidenceRecordId": null,
+      "expectedWarningLifecycle": []
+    }
+  ]
+}

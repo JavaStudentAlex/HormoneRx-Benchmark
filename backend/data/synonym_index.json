@@ -1,0 +1,178 @@
+{
+  "version": "0.2.0",
+  "note": "Approved deterministic normalization ontology. Aliases are matched case-insensitively on word boundaries; the longest surface form wins. An alias maps to exactly one concept. Ambiguous aliases deliberately map to a candidate set and force abstention (MORE_INFORMATION_REQUIRED) instead of guessing, per task spec §13 and §15.7. Unknown names are never assigned to a concept or class. Misspelled aliases mirror the misspellings documented in evidence_records.json synonym lists.",
+  "hormonalConcepts": {
+    "combined_hormonal_contraceptive": {
+      "canonicalName": "Combined hormonal contraceptive",
+      "aliases": [
+        "combined hormonal contraceptive",
+        "combined hormonal contraception",
+        "combined oral contraceptive",
+        "combined pill",
+        "coc",
+        "chc",
+        "ethinylestradiol-containing contraceptive",
+        "combined contraceptive patch",
+        "combined vaginal ring"
+      ]
+    },
+    "estrogen_containing_oral_contraceptive": {
+      "canonicalName": "Estrogen-containing oral contraceptive",
+      "aliases": [
+        "estrogen-containing oral contraceptive",
+        "estrogen containing oral contraceptive",
+        "estrogen-containing contraceptive",
+        "estrogen-containing pill",
+        "estrogen containing pill",
+        "ethinylestradiol-containing oral contraceptive"
+      ]
+    },
+    "progestogen_only_pill": {
+      "canonicalName": "Progestogen-only pill",
+      "aliases": [
+        "progestogen-only pill",
+        "progestogen only pill",
+        "progesterone only pill",
+        "progesterone-only pill",
+        "pop",
+        "mini pill",
+        "mini-pill",
+        "minipill",
+        "desogestrel pill",
+        "traditional pop",
+        "drospirenone-only pill"
+      ]
+    },
+    "etonogestrel_implant": {
+      "canonicalName": "Etonogestrel implant",
+      "aliases": [
+        "etonogestrel implant",
+        "contraceptive implant",
+        "the implant",
+        "nexplanon",
+        "implanon",
+        "eng-imp",
+        "subdermal implant"
+      ]
+    },
+    "levonorgestrel_emergency_contraception": {
+      "canonicalName": "Levonorgestrel emergency contraception",
+      "aliases": [
+        "levonorgestrel emergency contraception",
+        "levonorgestrel ec",
+        "lng-ec",
+        "emergency contraceptive pill",
+        "morning-after pill",
+        "morning after pill",
+        "levonelle",
+        "plan b",
+        "levonorgestrel 1.5 mg tablet"
+      ]
+    }
+  },
+  "medicationConcepts": {
+    "carbamazepine": {
+      "canonicalName": "Carbamazepine",
+      "aliases": ["carbamazepine", "tegretol", "carbamezapine", "carbamazapine"]
+    },
+    "rifampicin": {
+      "canonicalName": "Rifampicin",
+      "aliases": ["rifampicin", "rifampin", "rifadin", "rimactane"]
+    },
+    "rifabutin": {
+      "canonicalName": "Rifabutin",
+      "aliases": ["rifabutin", "mycobutin"]
+    },
+    "phenytoin": {
+      "canonicalName": "Phenytoin",
+      "aliases": ["phenytoin", "epanutin", "dilantin"]
+    },
+    "phenobarbital": {
+      "canonicalName": "Phenobarbital",
+      "aliases": ["phenobarbital", "phenobarbitone"]
+    },
+    "primidone": {
+      "canonicalName": "Primidone",
+      "aliases": ["primidone"]
+    },
+    "lamotrigine": {
+      "canonicalName": "Lamotrigine",
+      "aliases": ["lamotrigine", "lamictal", "lamotrigin", "lamotragine"]
+    },
+    "efavirenz": {
+      "canonicalName": "Efavirenz",
+      "aliases": ["efavirenz", "sustiva"]
+    },
+    "st_johns_wort": {
+      "canonicalName": "St John's wort",
+      "aliases": ["st john's wort", "st johns wort", "st. john's wort", "saint john's wort", "hypericum"]
+    },
+    "griseofulvin": {
+      "canonicalName": "Griseofulvin",
+      "aliases": ["griseofulvin"]
+    }
+  },
+  "ambiguousHormonalAliases": {
+    "the pill": {
+      "candidates": ["combined_hormonal_contraceptive", "progestogen_only_pill", "estrogen_containing_oral_contraceptive"],
+      "missingInformation": "The specific pill type (combined / progestogen-only / estrogen-containing) is not stated."
+    },
+    "a pill": {
+      "candidates": ["combined_hormonal_contraceptive", "progestogen_only_pill", "estrogen_containing_oral_contraceptive"],
+      "missingInformation": "The specific pill type (combined / progestogen-only / estrogen-containing) is not stated."
+    },
+    "birth control pill": {
+      "candidates": ["combined_hormonal_contraceptive", "progestogen_only_pill", "estrogen_containing_oral_contraceptive"],
+      "missingInformation": "The specific pill type (combined / progestogen-only / estrogen-containing) is not stated."
+    },
+    "oral contraceptive": {
+      "candidates": ["combined_hormonal_contraceptive", "progestogen_only_pill", "estrogen_containing_oral_contraceptive"],
+      "missingInformation": "The specific oral contraceptive type (combined / progestogen-only / estrogen-containing) is not stated."
+    },
+    "hormonal contraception": {
+      "candidates": ["combined_hormonal_contraceptive", "progestogen_only_pill", "estrogen_containing_oral_contraceptive", "etonogestrel_implant", "levonorgestrel_emergency_contraception"],
+      "missingInformation": "The specific hormonal contraceptive method is not stated."
+    },
+    "hormonal contraceptive": {
+      "candidates": ["combined_hormonal_contraceptive", "progestogen_only_pill", "estrogen_containing_oral_contraceptive", "etonogestrel_implant", "levonorgestrel_emergency_contraception"],
+      "missingInformation": "The specific hormonal contraceptive method is not stated."
+    },
+    "contraception": {
+      "candidates": ["combined_hormonal_contraceptive", "progestogen_only_pill", "estrogen_containing_oral_contraceptive", "etonogestrel_implant", "levonorgestrel_emergency_contraception"],
+      "missingInformation": "The specific hormonal contraceptive method is not stated."
+    },
+    "birth control": {
+      "candidates": ["combined_hormonal_contraceptive", "progestogen_only_pill", "estrogen_containing_oral_contraceptive", "etonogestrel_implant", "levonorgestrel_emergency_contraception"],
+      "missingInformation": "The specific hormonal contraceptive method is not stated."
+    }
+  },
+  "ambiguousMedicationAliases": {
+    "enzyme inducer": {
+      "missingInformation": "A drug-class word was mentioned without a specific medication name."
+    },
+    "enzyme-inducing drug": {
+      "missingInformation": "A drug-class word was mentioned without a specific medication name."
+    },
+    "enzyme inducers": {
+      "missingInformation": "A drug-class word was mentioned without a specific medication name."
+    },
+    "cyp3a4 inducer": {
+      "missingInformation": "A drug-class word was mentioned without a specific medication name."
+    },
+    "barbiturates": {
+      "missingInformation": "A drug-class word (barbiturates) was mentioned without a specific medication name."
+    }
+  },
+  "nonInteractingMedications": [
+    "paracetamol",
+    "acetaminophen",
+    "ibuprofen",
+    "sertraline",
+    "amlodipine",
+    "ramipril",
+    "aspirin",
+    "omeprazole",
+    "metformin",
+    "atorvastatin"
+  ]
+}

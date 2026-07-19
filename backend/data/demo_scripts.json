@@ -1,0 +1,55 @@
+{
+  "version": "0.2.0",
+  "note": "Scripted synthetic consultations for the live-demo replay (spec §35). The backend replays each turn as partial caption chunks followed by a finalized turn through the full pipeline — extraction, graph, matching, and warnings are computed live, not cached.",
+  "scripts": [
+    {
+      "id": "demo-1-incremental-positive",
+      "label": "Demo 1 · Incremental positive match",
+      "description": "Context completes across turns: carbamazepine first (more information required), then the combined pill (evidence found, INT-001).",
+      "turns": [
+        { "speaker": "doctor", "text": "Are you currently taking any regular medication?", "pause_ms": 900 },
+        { "speaker": "patient", "text": "Yes, I take Tegretol.", "pause_ms": 1200 },
+        { "speaker": "doctor", "text": "Are you using hormonal contraception?", "pause_ms": 900 },
+        { "speaker": "patient", "text": "Yes, I use the combined pill.", "pause_ms": 1200 }
+      ]
+    },
+    {
+      "id": "demo-2-correction-retraction",
+      "label": "Demo 2 · Correction and retraction",
+      "description": "Same as Demo 1, then the patient corrects: Tegretol was stopped last year. The warning is visibly retracted.",
+      "turns": [
+        { "speaker": "doctor", "text": "Are you currently taking any regular medication?", "pause_ms": 900 },
+        { "speaker": "patient", "text": "Yes, I take Tegretol.", "pause_ms": 1200 },
+        { "speaker": "doctor", "text": "Are you using hormonal contraception?", "pause_ms": 900 },
+        { "speaker": "patient", "text": "Yes, I use the combined pill.", "pause_ms": 1600 },
+        { "speaker": "patient", "text": "Sorry, I stopped Tegretol last year.", "pause_ms": 1200 }
+      ]
+    },
+    {
+      "id": "demo-3-reversed-direction",
+      "label": "Demo 3 · Reversed direction (lamotrigine)",
+      "description": "Lamotrigine plus an estrogen-containing pill: the evidence direction is the contraceptive reducing lamotrigine exposure (INT-005), not the reverse.",
+      "turns": [
+        { "speaker": "doctor", "text": "Which medications are you taking at the moment?", "pause_ms": 900 },
+        { "speaker": "patient", "text": "I take lamotrigine and use an estrogen-containing pill.", "pause_ms": 1200 }
+      ]
+    },
+    {
+      "id": "demo-4-ambiguous-method",
+      "label": "Demo 4 · Ambiguous hormonal method",
+      "description": "\"The pill\" is deliberately not guessed: the system abstains and asks for the exact method.",
+      "turns": [
+        { "speaker": "patient", "text": "I take carbamazepine and use the pill.", "pause_ms": 1200 }
+      ]
+    },
+    {
+      "id": "demo-5-other-person",
+      "label": "Demo 5 · Another person's medication",
+      "description": "The sister's carbamazepine must not be attributed to the patient; no patient warning is produced.",
+      "turns": [
+        { "speaker": "patient", "text": "My sister takes carbamazepine.", "pause_ms": 1100 },
+        { "speaker": "patient", "text": "I use the combined pill.", "pause_ms": 1200 }
+      ]
+    }
+  ]
+}

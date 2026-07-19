@@ -10,6 +10,9 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --port 4173 --strictPort",
     "benchmark": "tsx scripts/run_benchmark.ts",
+    "backend": "backend/.venv/bin/uvicorn app.main:app --port 8000 --app-dir backend",
+    "backend:test": "cd backend && .venv/bin/python -m pytest -q",
+    "benchmark:backend": "cd backend && .venv/bin/python -m app.benchmark --layer all",
     "test": "vitest run",
     "test:watch": "vitest"
   },

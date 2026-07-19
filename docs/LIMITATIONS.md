@@ -13,3 +13,18 @@ Read this before drawing any conclusion from the app or benchmark.
 - **Verification status.** All six records are currently `physicianVerified: false` pending final physician confirmation. Until confirmed, describe the dataset as "physician-reviewed, source-verification pending."
 - **Jurisdictional variation.** Guidance differs by country (e.g. FSRH/MHRA are UK; CDC US-MEC and the FDA label are US). Records note their jurisdiction; do not assume cross-jurisdiction applicability.
 - **Sources change over time.** `lastVerified` dates are recorded per record; guidance and labels are updated periodically and should be re-checked.
+
+## Realtime engine limitations (v0.2.0)
+
+- **Deterministic demo extractor** is cue-list based; phrasings outside its cue lists
+  (and the live model's errors) are not represented in the 100% demo-mode metrics.
+- **Speaker labels are manual** (Doctor/Patient/Unknown selector); automatic diarization
+  is not implemented, and subject attribution inherits any mislabeling.
+- **Planned hormonal products** are not treated as an eligible proposed pair (only
+  planned medications are, per spec §16.5) — a known blind spot.
+- **Audio benchmark layer is not executed** (no recordings, no transcription key in the
+  build environment); its gold labels are frozen but unmeasured.
+- **Live mode is untested against the real provider API** — the relay and credential
+  minting are implemented and unit-tested with fake transports only (see MORNING_REVIEW).
+- **Backend latency numbers** cover the deterministic pipeline only; live model latency
+  is unmeasured.

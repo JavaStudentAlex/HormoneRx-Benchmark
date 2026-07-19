@@ -1,5 +1,6 @@
 import type { EvidenceDataset, EvidenceRecord } from './types';
-import raw from '../data/evidence_records.json';
+// Canonical evidence lives in backend/data (single source of truth for backend + frontend).
+import raw from '../../backend/data/evidence_records.json';
 
 const dataset = raw as EvidenceDataset;
 
