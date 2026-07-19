@@ -48,6 +48,16 @@ function parseSpeaker(value: unknown, fallback: Speaker = Speaker.PATIENT): Spea
   throw new RangeError(`invalid speaker ${JSON.stringify(value)}`);
 }
 
+/**
+ * Absent means "let the service attribute the speaker" — unlike parseSpeaker,
+ * which conflates absent with an explicit fallback label.
+ */
+function parseOptionalSpeaker(value: unknown): Speaker | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && SPEAKER_VALUES.includes(value)) return value as Speaker;
+  throw new RangeError(`invalid speaker ${JSON.stringify(value)}`);
+}
+
 export function createBackend(settings: Settings = getSettings()): Backend {
   let index: EvidenceIndex;
   try {
@@ -245,7 +255,7 @@ export function createBackend(settings: Settings = getSettings()): Backend {
         service.processFinalTurn(runtime, {
           event_id: (req.body?.event_id as string | undefined) ?? newId('evt'),
           text: String(req.body?.text ?? ''),
-          speaker: parseSpeaker(req.body?.speaker),
+          speaker: parseOptionalSpeaker(req.body?.speaker),
           sequence: (req.body?.sequence as number | undefined) ?? null,
         }),
       )
@@ -413,7 +423,10 @@ async function handleClientEvent(
   const msgType = String(message.type ?? '');
   try {
     if (msgType === 'transcript.partial') {
-      const speaker = parseSpeaker(message.speaker, runtime.active_speaker);
+      // Provisional captions are display-only; without an explicit label they
+      // stay 'unknown' (neutral) rather than guessing — the resolved speaker
+      // arrives moments later on the finalized turn.
+      const speaker = parseSpeaker(message.speaker, runtime.speaker_override ?? Speaker.UNKNOWN);
       service.recordPartial(runtime, String(message.text ?? ''), speaker);
       service.broadcast(runtime, {
         type: 'caption.updated',
@@ -425,7 +438,7 @@ async function handleClientEvent(
       await service.processFinalTurn(runtime, {
         event_id: (message.event_id as string | undefined) || newId('evt'),
         text: String(message.text ?? ''),
-        speaker: parseSpeaker(message.speaker, runtime.active_speaker),
+        speaker: parseOptionalSpeaker(message.speaker),
         sequence: (message.sequence as number | undefined) ?? null,
         provider_item_id: (message.provider_item_id as string | undefined) ?? null,
         started_at_ms: (message.started_at_ms as number | undefined) ?? null,
@@ -495,7 +508,9 @@ async function handleAudioSocket(
   const onPartial = (text: string): void => {
     service.broadcast(runtime, {
       type: 'caption.updated',
-      speaker: runtime.active_speaker,
+      // Neutral until finalization: the mic stream carries no speaker label,
+      // and the resolved role lands with the finalized turn moments later.
+      speaker: runtime.speaker_override ?? Speaker.UNKNOWN,
       text,
       provisional: true,
     });
@@ -506,7 +521,9 @@ async function handleAudioSocket(
       await service.processFinalTurn(runtime, {
         event_id: newId('evt'),
         text,
-        speaker: runtime.active_speaker,
+        // Always attributed server-side; a deliberate speaker.changed control
+        // frame still overrides via runtime.speaker_override.
+        speaker: null,
         provider_item_id: itemId,
       });
     } catch (err) {

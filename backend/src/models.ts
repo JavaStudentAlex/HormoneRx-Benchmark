@@ -31,6 +31,17 @@ export const Speaker = {
 export type Speaker = (typeof Speaker)[keyof typeof Speaker];
 export const SPEAKER_VALUES: readonly string[] = Object.values(Speaker);
 
+/** How a turn's speaker label was resolved at ingestion (provenance). */
+export const SpeakerSource = {
+  /** Field present on the message, or a deliberate client speaker.changed override. */
+  EXPLICIT: 'explicit',
+  INFERRED_LLM: 'inferred_llm',
+  INFERRED_HEURISTIC: 'inferred_heuristic',
+  /** Attribution disabled: legacy active_speaker fallback. */
+  DEFAULT: 'default',
+} as const;
+export type SpeakerSource = (typeof SpeakerSource)[keyof typeof SpeakerSource];
+
 export const SubjectRole = {
   PATIENT: 'patient',
   DOCTOR: 'doctor',
@@ -161,6 +172,10 @@ export interface TranscriptTurn {
   ended_at_ms: number | null;
   received_at: IsoDateTime;
   arrived_late: boolean;
+  // Optional provenance for inferred speaker labels (absent in historical
+  // event logs; never defaulted so old payloads replay byte-identically).
+  speaker_source?: SpeakerSource;
+  speaker_confidence?: number | null;
 }
 
 export function makeTranscriptTurn(

@@ -20,6 +20,7 @@ import {
   PrescriptionProposal,
   ResultState,
   Speaker,
+  SpeakerSource,
   TranscriptTurn,
   TurnLatency,
   WarningRecord,
@@ -30,6 +31,7 @@ import {
   utcnow,
 } from './models.ts';
 import { ConceptNormalizer } from './normalizer.ts';
+import { SpeakerAttributor, buildSpeakerAttributor } from './speakerAttribution.ts';
 import { ReconcileOutcome, WarningEngine } from './warningEngine.ts';
 
 export class DuplicateEventError extends Error {
@@ -86,6 +88,13 @@ export class EncounterRuntime {
   latencies: TurnLatency[] = [];
   subscribers = new Set<JsonSubscriber>();
   active_speaker: Speaker = Speaker.PATIENT;
+  /**
+   * Set only by a deliberate client speaker.changed event. When present it
+   * takes precedence over inference for label-less turns; when null (the
+   * default — no toggle exists in the unified UI) such turns are attributed
+   * automatically.
+   */
+  speaker_override: Speaker | null = null;
   created_at = utcnow();
 
   constructor(
@@ -111,6 +120,7 @@ export class EncounterService {
     public settings: Settings,
     public index: EvidenceIndex,
     public extractor: MedicationContextExtractor,
+    public speakerAttributor: SpeakerAttributor = buildSpeakerAttributor(settings),
   ) {
     this.fallbackExtractor = new DeterministicExtractor(index);
     this.normalizer = new ConceptNormalizer(index);
@@ -162,6 +172,7 @@ export class EncounterService {
 
   async changeSpeaker(runtime: EncounterRuntime, speaker: Speaker): Promise<void> {
     runtime.active_speaker = speaker;
+    runtime.speaker_override = speaker;
     runtime.store.append(EventType.SPEAKER_CHANGED, { speaker }, { speaker });
   }
 
@@ -179,7 +190,8 @@ export class EncounterService {
     args: {
       event_id: string;
       text: string;
-      speaker: Speaker;
+      /** Explicit label; null/undefined means "resolve it server-side". */
+      speaker?: Speaker | null;
       sequence?: number | null;
       provider_item_id?: string | null;
       started_at_ms?: number | null;
@@ -200,6 +212,37 @@ export class EncounterService {
         return runtime.snapshot;
       }
 
+      // Speaker resolution happens exactly once, here, and the result is
+      // persisted below — replaying the event log never re-runs inference.
+      // Placed before t0 so TurnLatency keeps measuring the analysis pipeline
+      // only; attribution cost is reported separately in the event payload.
+      let speaker: Speaker;
+      let speakerSource: SpeakerSource;
+      let speakerConfidence: number | null = null;
+      let attributionModel: string | null = null;
+      let attributionMs: number | null = null;
+      if (args.speaker != null) {
+        speaker = args.speaker;
+        speakerSource = SpeakerSource.EXPLICIT;
+      } else if (runtime.speaker_override != null) {
+        speaker = runtime.speaker_override;
+        speakerSource = SpeakerSource.EXPLICIT;
+      } else if (this.settings.speaker_attribution_enabled) {
+        const a0 = performance.now();
+        const attribution = await this.speakerAttributor.attribute({
+          text: args.text,
+          context: runtime.snapshot.turns.slice(-this.settings.speaker_attribution_context_turns),
+        });
+        attributionMs = Math.round((performance.now() - a0) * 100) / 100;
+        speaker = attribution.speaker;
+        speakerSource = attribution.source;
+        speakerConfidence = attribution.confidence;
+        attributionModel = attribution.model;
+      } else {
+        speaker = runtime.active_speaker;
+        speakerSource = SpeakerSource.DEFAULT;
+      }
+
       const receivedAt = utcnow();
       const t0 = performance.now();
 
@@ -211,21 +254,36 @@ export class EncounterService {
         turn_id: `turn-${seq}`,
         provider_item_id: args.provider_item_id ?? null,
         sequence: seq,
-        speaker: args.speaker,
+        speaker,
         text: args.text,
         is_final: true,
         started_at_ms: args.started_at_ms ?? null,
         ended_at_ms: args.ended_at_ms ?? null,
         received_at: receivedAt,
         arrived_late: arrivedLate,
+        ...(speakerSource !== SpeakerSource.EXPLICIT
+          ? { speaker_source: speakerSource, speaker_confidence: speakerConfidence }
+          : {}),
       };
       runtime.store.append(
         EventType.TRANSCRIPT_FINAL_RECEIVED,
-        { turn },
+        {
+          turn,
+          ...(speakerSource !== SpeakerSource.EXPLICIT
+            ? {
+                speaker_attribution: {
+                  source: speakerSource,
+                  model: attributionModel,
+                  confidence: speakerConfidence,
+                  attribution_ms: attributionMs,
+                },
+              }
+            : {}),
+        },
         {
           eventId: args.event_id,
           providerItemId: args.provider_item_id ?? null,
-          speaker: args.speaker,
+          speaker,
           sequence: seq,
         },
       );
@@ -235,7 +293,7 @@ export class EncounterService {
       this.broadcast(runtime, {
         type: 'result.processing',
         turn_id: turn.turn_id,
-        speaker: args.speaker,
+        speaker,
       });
 
       // Structured extraction with validated output; deterministic fallback on failure.
@@ -247,7 +305,7 @@ export class EncounterService {
         runtime.store.append(
           EventType.EXTRACTION_FAILED,
           { turn_id: turn.turn_id, error: String(err.message) },
-          { speaker: args.speaker },
+          { speaker },
         );
         if (this.settings.extraction_fallback_deterministic) {
           extraction = await this.fallbackExtractor.extract(turn);
@@ -276,7 +334,7 @@ export class EncounterService {
           corrections: extraction.corrections,
           missing_information: extraction.missing_information,
         },
-        { speaker: args.speaker },
+        { speaker },
       );
 
       const snapshot = await this.recompute(runtime, turn, [t0, t1]);

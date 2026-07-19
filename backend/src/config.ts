@@ -30,6 +30,14 @@ export interface Settings {
   // becomes irrelevant.
   evidence_allow_pending_verification: boolean;
   extraction_fallback_deterministic: boolean;
+  // -- speaker-role attribution ---------------------------------------------
+  // When a finalized turn arrives without an explicit speaker label, the
+  // backend infers doctor/patient/other_person/unknown from the conversation.
+  // Kill switch restores the legacy behavior (label with active_speaker).
+  speaker_attribution_enabled: boolean;
+  speaker_attribution_model: string | null;
+  speaker_attribution_context_turns: number;
+  speaker_attribution_timeout_ms: number;
   log_level: string;
   // -- agent fleet (v0.4.0) -------------------------------------------------
   fleet_enabled: boolean;
@@ -62,6 +70,10 @@ export function defaultSettings(overrides: Partial<Settings> = {}): Settings {
     strict_evidence_validation: true,
     evidence_allow_pending_verification: true,
     extraction_fallback_deterministic: true,
+    speaker_attribution_enabled: true,
+    speaker_attribution_model: null,
+    speaker_attribution_context_turns: 6,
+    speaker_attribution_timeout_ms: 8000,
     log_level: 'INFO',
     fleet_enabled: true,
     fleet_washout_sentinel: false,
@@ -100,6 +112,10 @@ export function getSettings(): Settings {
       ? false
       : envBool('EVIDENCE_ALLOW_PENDING_VERIFICATION', true),
     extraction_fallback_deterministic: envBool('EXTRACTION_FALLBACK_DETERMINISTIC', true),
+    speaker_attribution_enabled: envBool('SPEAKER_ATTRIBUTION_ENABLED', true),
+    speaker_attribution_model: env.SPEAKER_ATTRIBUTION_MODEL || null,
+    speaker_attribution_context_turns: Number(env.SPEAKER_ATTRIBUTION_CONTEXT_TURNS ?? 6),
+    speaker_attribution_timeout_ms: Number(env.SPEAKER_ATTRIBUTION_TIMEOUT_MS ?? 8000),
     log_level: env.LOG_LEVEL ?? 'INFO',
     fleet_enabled: envBool('FLEET_ENABLED', true),
     fleet_washout_sentinel: isProduction ? false : envBool('FLEET_WASHOUT_SENTINEL', false),

@@ -5,7 +5,7 @@
     "engine": "hormonerx-backend-ts/0.3.0",
     "extractionModel": "deterministic-rule-extractor/0.2.0",
     "mode": "demo-deterministic",
-    "evalTimestamp": "2026-07-19T06:54:01.604Z",
+    "evalTimestamp": "2026-07-19T10:06:21.828Z",
     "deterministic": true,
     "runtimeEligibleRecords": [
       "INT-001",
@@ -341,8 +341,8 @@
       "processingLatency": {
         "samples": 53,
         "medianMs": 0.15,
-        "p90Ms": 0.37,
-        "maxMs": 4.07,
+        "p90Ms": 0.43,
+        "maxMs": 4.06,
         "note": "Backend pipeline only (final transcript received -> result computed), deterministic extractor, no network. Live-mode model latency is not included and must be measured separately."
       },
       "cases": [
@@ -881,6 +881,411 @@
       "reason": "6 audio files not recorded yet; no OPENAI_API_KEY for live transcription",
       "caseCount": 6,
       "note": "Results are only reported for runs that actually happened. Record the manifest audio and set OPENAI_API_KEY to execute this layer."
+    },
+    "index": {
+      "layer": "D-index",
+      "metrics": {
+        "baseRecordCount": 6,
+        "expandedRecordCount": 10,
+        "generatedRecordCount": 4,
+        "basePairCount": 28,
+        "expandedPairCount": 47,
+        "pairGrowthFactor": 1.6786,
+        "commercialSafeRecords": 4,
+        "supersetOk": true,
+        "realAvgNsPerLookup": 52.9919,
+        "realThroughputPerSec": 18870793,
+        "stress100kAvgNsPerLookup": 206.7643,
+        "buildProblemCount": 0
+      },
+      "build": {
+        "builtBy": "backend/ingest/build_index.ts",
+        "curatedDatasetVersion": "0.2.0",
+        "seedSetVersion": "0.1.0",
+        "recordCount": 10,
+        "curatedRecordCount": 6,
+        "generatedRecordCount": 4,
+        "hormonalConceptCount": 5,
+        "medicationConceptCount": 10,
+        "distinctPairCount": 47,
+        "totalPairEmissions": 47,
+        "skippedDuplicatePairs": 0,
+        "skippedRecordsAllDuplicate": 0,
+        "licenseBreakdown": {
+          "curated_prototype": 6,
+          "public_domain": 4
+        },
+        "severityBreakdown": {
+          "2": 1,
+          "3": 3,
+          "unscored": 6
+        },
+        "distinctSources": [
+          "Faculty of Sexual and Reproductive Healthcare (FSRH)",
+          "Faculty of Sexual and Reproductive Healthcare (FSRH); U.S. Centers for Disease Control and Prevention (CDC)",
+          "Medicines and Healthcare products Regulatory Agency (MHRA)",
+          "U.S. Centers for Disease Control and Prevention (CDC)",
+          "U.S. Food and Drug Administration (FDA); Faculty of Sexual and Reproductive Healthcare (FSRH)"
+        ],
+        "commercialSafeRecords": 4,
+        "contentHash": "9402897cd197ae76",
+        "problems": []
+      },
+      "realIndexLatency": {
+        "iterations": 1000000,
+        "avgNsPerLookup": 52.9919,
+        "throughputPerSec": 18870793,
+        "p50Ns": 58,
+        "p90Ns": 123,
+        "p99Ns": 178,
+        "maxNs": 432375
+      },
+      "syntheticStressLatency": {
+        "1000": {
+          "iterations": 1000000,
+          "avgNsPerLookup": 73.8254,
+          "throughputPerSec": 13545476,
+          "p50Ns": 60,
+          "p90Ns": 62,
+          "p99Ns": 83,
+          "maxNs": 16389
+        },
+        "10000": {
+          "iterations": 1000000,
+          "avgNsPerLookup": 90.2161,
+          "throughputPerSec": 11084500,
+          "p50Ns": 58,
+          "p90Ns": 62,
+          "p99Ns": 79,
+          "maxNs": 17099
+        },
+        "100000": {
+          "iterations": 1000000,
+          "avgNsPerLookup": 206.7643,
+          "throughputPerSec": 4836425,
+          "p50Ns": 55,
+          "p90Ns": 60,
+          "p99Ns": 73,
+          "maxNs": 17417
+        }
+      },
+      "supersetCheck": {
+        "controlPairCount": 28,
+        "missingFromExpanded": [],
+        "ok": true
+      },
+      "problems": []
+    },
+    "soundagent": {
+      "layer": "E-soundagent",
+      "caseCount": 6,
+      "metrics": {
+        "casePassRate": 1,
+        "finalStateAccuracy": 1,
+        "recordAccuracy": 1,
+        "warningLifecycleAccuracy": 1,
+        "affectSegmentsProduced": 11,
+        "distressFlaggedSegments": 0,
+        "affectAdvisoryInvariantHeld": true,
+        "unsupportedClaimCount": 0,
+        "affectBackendRequested": "auto",
+        "affectProvider": "text",
+        "openaiKeyPresent": false,
+        "elevenlabsKeyPresent": false,
+        "ttsProviderUsed": null,
+        "ttsCalls": 0,
+        "ttsOk": 0,
+        "affectCalls": 0,
+        "affectOk": 0,
+        "affectModelsUsed": [],
+        "affectMeanLatencyMs": 0,
+        "affectErrorCount": 0,
+        "serDevice": null
+      },
+      "note": "Cloud-first affect. auto = OpenAI gpt-4o-audio (primary) -> ElevenLabs Scribe -> Layer-1 text; local GPU sidecar runs ONLY with AFFECT_BACKEND=sidecar. Cloud path: TTS-synthesized speech (OpenAI/ElevenLabs) -> affect model. Affect stays advisory; the summarize->deterministic-warning path (state/record/lifecycle vs gold) is unchanged and above. Keys read from env server-side only.",
+      "affectSampleResults": [],
+      "affectErrorsSample": [],
+      "emittedEventsSample": [
+        {
+          "case": "AUDIO-001",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-901152b8e2f4",
+          "speaker": "doctor",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-001",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-f95cea66527f",
+          "speaker": "patient",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-001",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-f373bcb46397",
+          "speaker": "doctor",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-001",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-762b1b6f1d64",
+          "speaker": "patient",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-001",
+          "event_type": "RELATIONAL_SIGNAL_RECEIVED",
+          "clinician_talk_ratio": 0.545,
+          "possible_dismissal": false,
+          "confidence": "speculative"
+        },
+        {
+          "case": "AUDIO-002",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-6a3f6159f612",
+          "speaker": "patient",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-002",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-3d958634b2fa",
+          "speaker": "patient",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-002",
+          "event_type": "RELATIONAL_SIGNAL_RECEIVED",
+          "clinician_talk_ratio": 0,
+          "possible_dismissal": false,
+          "confidence": "speculative"
+        },
+        {
+          "case": "AUDIO-003",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-5e0cd6a13f6d",
+          "speaker": "patient",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-003",
+          "event_type": "RELATIONAL_SIGNAL_RECEIVED",
+          "clinician_talk_ratio": 0,
+          "possible_dismissal": false,
+          "confidence": "speculative"
+        },
+        {
+          "case": "AUDIO-004",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-58d982208ca4",
+          "speaker": "patient",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-004",
+          "event_type": "RELATIONAL_SIGNAL_RECEIVED",
+          "clinician_talk_ratio": 0,
+          "possible_dismissal": false,
+          "confidence": "speculative"
+        },
+        {
+          "case": "AUDIO-005",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-1e6206cbb60a",
+          "speaker": "patient",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-005",
+          "event_type": "RELATIONAL_SIGNAL_RECEIVED",
+          "clinician_talk_ratio": 0,
+          "possible_dismissal": false,
+          "confidence": "speculative"
+        },
+        {
+          "case": "AUDIO-006",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-6bb98ce77871",
+          "speaker": "patient",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-006",
+          "event_type": "AFFECT_SEGMENT_RECEIVED",
+          "segment_id": "seg-bd841e6c588a",
+          "speaker": "patient",
+          "distress_level": "none",
+          "distress_basis": [],
+          "advisory": true
+        },
+        {
+          "case": "AUDIO-006",
+          "event_type": "RELATIONAL_SIGNAL_RECEIVED",
+          "clinician_talk_ratio": 0,
+          "possible_dismissal": false,
+          "confidence": "speculative"
+        }
+      ],
+      "cases": [
+        {
+          "id": "AUDIO-001",
+          "expectedFinalState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-001",
+          "actualEvidenceRecordId": "INT-001",
+          "lifecycleOk": true,
+          "pass": true
+        },
+        {
+          "id": "AUDIO-002",
+          "expectedFinalState": [
+            "RETRACTED",
+            "EXCLUDED_CONTEXT"
+          ],
+          "actualResultState": "RETRACTED",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "lifecycleOk": true,
+          "pass": true
+        },
+        {
+          "id": "AUDIO-003",
+          "expectedFinalState": "EXCLUDED_CONTEXT",
+          "actualResultState": "EXCLUDED_CONTEXT",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "lifecycleOk": true,
+          "pass": true
+        },
+        {
+          "id": "AUDIO-004",
+          "expectedFinalState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-005",
+          "actualEvidenceRecordId": "INT-005",
+          "lifecycleOk": true,
+          "pass": true
+        },
+        {
+          "id": "AUDIO-005",
+          "expectedFinalState": "MORE_INFORMATION_REQUIRED",
+          "actualResultState": "MORE_INFORMATION_REQUIRED",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "lifecycleOk": true,
+          "pass": true
+        },
+        {
+          "id": "AUDIO-006",
+          "expectedFinalState": "EXCLUDED_CONTEXT",
+          "actualResultState": "EXCLUDED_CONTEXT",
+          "expectedEvidenceRecordId": null,
+          "actualEvidenceRecordId": null,
+          "lifecycleOk": true,
+          "pass": true
+        }
+      ]
+    },
+    "affectprobe": {
+      "layer": "F-affectprobe",
+      "caseCount": 9,
+      "metrics": {
+        "layer1BucketAccuracy": 1,
+        "layer1DistressDetectAccuracy": 1,
+        "cloudModel": null,
+        "cloudScored": 0,
+        "cloudDistressSeparationAccuracy": null,
+        "cloudErrorCount": 0
+      },
+      "note": "Signal test (no drug entities -> cannot warn). Layer-1 = deterministic lexical distress; cloud = OpenAI gpt-4o-mini text affect. Both advisory. Measures whether distress utterances separate from neutral, per gold label.",
+      "rows": [
+        {
+          "id": "AP-N1",
+          "expected": "none",
+          "layer1Level": "none",
+          "cloudEmotion": null,
+          "cloudDistress": null
+        },
+        {
+          "id": "AP-N2",
+          "expected": "none",
+          "layer1Level": "none",
+          "cloudEmotion": null,
+          "cloudDistress": null
+        },
+        {
+          "id": "AP-N3",
+          "expected": "none",
+          "layer1Level": "none",
+          "cloudEmotion": null,
+          "cloudDistress": null
+        },
+        {
+          "id": "AP-L1",
+          "expected": "low",
+          "layer1Level": "low",
+          "cloudEmotion": null,
+          "cloudDistress": null
+        },
+        {
+          "id": "AP-L2",
+          "expected": "low",
+          "layer1Level": "low",
+          "cloudEmotion": null,
+          "cloudDistress": null
+        },
+        {
+          "id": "AP-E1",
+          "expected": "elevated",
+          "layer1Level": "elevated",
+          "cloudEmotion": null,
+          "cloudDistress": null
+        },
+        {
+          "id": "AP-E2",
+          "expected": "elevated",
+          "layer1Level": "elevated",
+          "cloudEmotion": null,
+          "cloudDistress": null
+        },
+        {
+          "id": "AP-E3",
+          "expected": "elevated",
+          "layer1Level": "elevated",
+          "cloudEmotion": null,
+          "cloudDistress": null
+        },
+        {
+          "id": "AP-E4",
+          "expected": "elevated",
+          "layer1Level": "elevated",
+          "cloudEmotion": null,
+          "cloudDistress": null
+        }
+      ],
+      "cloudErrorsSample": []
     }
   }
 }
