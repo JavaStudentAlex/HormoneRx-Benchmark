@@ -89,25 +89,10 @@ export function serToCategorical(r: SerResult, model: string): CategoricalEmotio
 // ---------------------------------------------------------------------------
 
 const AFFECT_SYSTEM_PROMPT =
-  'You are an audio affect summarizer. Listen to the segment and return ONLY structured JSON describing the ' +
-  "speaker's apparent emotional state and tone. You must NOT give medical, diagnostic, or safety advice, and " +
-  'you must NOT mention drugs, interactions, or clinical content. Output only the affect fields.';
-
-const AFFECT_JSON_SCHEMA = {
-  name: 'affect_summary',
-  strict: true,
-  schema: {
-    type: 'object',
-    additionalProperties: false,
-    properties: {
-      emotion: { type: 'string' },
-      tone: { type: 'string' },
-      distress_level: { type: 'string', enum: ['none', 'low', 'elevated'] },
-      evidence: { type: 'string' },
-    },
-    required: ['emotion', 'tone', 'distress_level', 'evidence'],
-  },
-} as const;
+  'You are an audio affect summarizer. Listen to the segment and return ONLY a JSON object with exactly these ' +
+  'keys: "emotion" (one word), "tone" (short phrase), "distress_level" (one of "none","low","elevated"), ' +
+  '"evidence" (short phrase). Describe the speaker\'s apparent emotional state and tone only. You must NOT give ' +
+  'medical, diagnostic, or safety advice, and you must NOT mention drugs, interactions, or clinical content.';
 
 function wavToBase64(audioPath: string): string {
   return readFileSync(audioPath).toString('base64');
@@ -136,7 +121,7 @@ export class OpenAiAudioAffectModel implements AffectModel {
       model: this.model,
       modalities: ['text'],
       temperature: 0,
-      response_format: { type: 'json_schema', json_schema: AFFECT_JSON_SCHEMA },
+      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: AFFECT_SYSTEM_PROMPT },
         {

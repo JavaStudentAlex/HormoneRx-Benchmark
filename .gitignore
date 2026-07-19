@@ -22,3 +22,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 backend/.venv/
+
+# Runtime-generated (not committed)
+backend/data/tts_tmp/
+backend/data/generated/

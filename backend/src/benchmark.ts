@@ -11,7 +11,7 @@
  * backend/data/benchmark_results.json and a UI copy of the streaming summary to
  * src/data/streaming_benchmark_results.json. Real numbers only.
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -23,13 +23,14 @@ import { EvidenceIndex, pairKey } from './evidenceIndex.ts';
 import { type DistressFlag, Speaker, activeWarnings, newId } from './models.ts';
 import { SoundAgent } from './soundAgent.ts';
 import {
-  SER_MODEL,
-  SER_PYTHON,
+  ElevenLabsAffectModel,
+  OpenAiAudioAffectModel,
   type SerResponse,
   type SerSegmentInput,
   runSidecarSer,
   serSidecarAvailable,
 } from './soundAgentModels.ts';
+import { synthElevenLabsTts, synthOpenAiTts } from './tts.ts';
 import { NO_MATCH_PRIMARY, NO_MATCH_SECONDARY } from './warningEngine.ts';
 
 const REPO_DIR = path.resolve(BACKEND_DIR, '..');
@@ -588,6 +589,7 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
   const emittedEvents: Array<Record<string, unknown>> = [];
   const caseResults: Array<Record<string, unknown>> = [];
   const serInputs: SerSegmentInput[] = [];
+  const speakerBySeg = new Map<string, Speaker>();
 
   for (const testCase of manifest.cases) {
     const service = buildService();
@@ -615,6 +617,7 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
       affectSegments++;
       caseAffectIds.add(affect.segment_id);
       serInputs.push({ segment_id: affect.segment_id, transcript: turn.text, audio_path: null });
+      speakerBySeg.set(affect.segment_id, turn.speaker as Speaker);
       if (affect.distress_flag.level !== 'none') distressFlagged++;
       turnsForRelational.push({ speaker: turn.speaker as Speaker, text: turn.text, distress: affect.distress_flag });
       emittedEvents.push({
@@ -688,20 +691,112 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
     });
   }
 
-  // Layer 2 — run the real on-prem GPU SER model over the segments (once).
-  let ser: SerResponse = { ok: false, error: 'not attempted' };
-  let serSkipReason: string | null = null;
-  if (serSidecarAvailable()) {
-    ser = runSidecarSer(serInputs);
-    if (!ser.ok) serSkipReason = ser.error ?? 'sidecar returned ok:false';
+  // ---- Layer 2 affect model — CLOUD FIRST; local GPU only when explicitly asked ----
+  const requested = (process.env.AFFECT_BACKEND || 'auto').toLowerCase();
+  const settings = getSettings();
+  const openaiKey = settings.openai_api_key;
+  const elevenKey = process.env.ELEVENLABS_API_KEY || null;
+
+  let affectProvider: 'openai' | 'elevenlabs' | 'sidecar' | 'text';
+  if (requested === 'openai' || requested === 'elevenlabs' || requested === 'sidecar' || requested === 'text') {
+    affectProvider = requested;
   } else {
-    serSkipReason = `SER sidecar unavailable (need ${SER_PYTHON} + backend/ser/infer.py + deps)`;
+    // auto: prefer cloud; never auto-prefer the local GPU.
+    affectProvider = openaiKey ? 'openai' : elevenKey ? 'elevenlabs' : 'text';
   }
-  const serLatencies = ser.ok && ser.results ? ser.results.map((r) => r.latency_ms) : [];
-  const serMeanLatencyMs = serLatencies.length
-    ? round4(serLatencies.reduce((a, b) => a + b, 0) / serLatencies.length)
+
+  const affectSampleResults: Array<Record<string, unknown>> = [];
+  const affectErrors: string[] = [];
+  const affectLatencies: number[] = [];
+  let ttsCalls = 0;
+  let ttsOk = 0;
+  let affectCalls = 0;
+  let affectOk = 0;
+  let serDevice: string | null = null;
+  let ttsProviderUsed: string | null = null;
+
+  if (affectProvider === 'sidecar') {
+    // Local GPU path — deprioritized; runs only when AFFECT_BACKEND=sidecar.
+    const ser: SerResponse = serSidecarAvailable()
+      ? runSidecarSer(serInputs)
+      : { ok: false, error: 'sidecar unavailable' };
+    serDevice = ser.device ?? null;
+    if (ser.ok && ser.results) {
+      affectCalls = ser.results.length;
+      affectOk = ser.results.length;
+      for (const r of ser.results) affectLatencies.push(r.latency_ms);
+      for (const r of ser.results.slice(0, 6)) {
+        affectSampleResults.push({ segment_id: r.segment_id, provider: 'sidecar', label: r.label, latency_ms: r.latency_ms });
+      }
+    } else {
+      affectErrors.push(String(ser.error));
+    }
+  } else if (affectProvider === 'openai' || affectProvider === 'elevenlabs') {
+    // Cloud path: TTS synth -> affect model, per segment (uses credits).
+    const ttsProvider: 'openai' | 'elevenlabs' | null = openaiKey ? 'openai' : elevenKey ? 'elevenlabs' : null;
+    ttsProviderUsed = ttsProvider;
+    if (!ttsProvider) {
+      affectErrors.push('no OPENAI/ELEVENLABS key in run env for TTS audio synthesis');
+    } else if ((affectProvider === 'openai' && !openaiKey) || (affectProvider === 'elevenlabs' && !elevenKey)) {
+      affectErrors.push(`AFFECT_BACKEND=${affectProvider} but its key is not present in the run env`);
+    } else {
+      const audioDir = path.join(BACKEND_DIR, 'data', 'tts_tmp');
+      mkdirSync(audioDir, { recursive: true });
+      const affectModel =
+        affectProvider === 'openai'
+          ? new OpenAiAudioAffectModel({ apiKey: openaiKey as string, baseUrl: settings.openai_base_url })
+          : new ElevenLabsAffectModel({ apiKey: elevenKey as string });
+      for (const seg of serInputs) {
+        const speaker = speakerBySeg.get(seg.segment_id) ?? Speaker.PATIENT;
+        const outPath = path.join(audioDir, `${seg.segment_id}.wav`);
+        const tts =
+          ttsProvider === 'openai'
+            ? await synthOpenAiTts({
+                apiKey: openaiKey as string,
+                baseUrl: settings.openai_base_url,
+                voice: speaker === Speaker.DOCTOR ? 'onyx' : 'nova',
+                text: seg.transcript,
+                outPath,
+              })
+            : await synthElevenLabsTts({
+                apiKey: elevenKey as string,
+                voiceId: process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM',
+                text: seg.transcript,
+                outPath,
+              });
+        ttsCalls++;
+        if (!tts.ok) {
+          affectErrors.push(`tts ${seg.segment_id}: ${tts.error}`);
+          continue;
+        }
+        ttsOk++;
+        const t0 = Date.now();
+        try {
+          const out = await affectModel.infer({ transcript: seg.transcript, audioPath: outPath });
+          affectCalls++;
+          affectOk++;
+          affectLatencies.push(Date.now() - t0);
+          if (affectSampleResults.length < 6) {
+            affectSampleResults.push({
+              segment_id: seg.segment_id,
+              provider: affectProvider,
+              emotion: out.categorical_emotion?.label ?? null,
+              events: out.events ?? [],
+            });
+          }
+        } catch (e) {
+          affectCalls++;
+          affectErrors.push(`affect ${seg.segment_id}: ${String(e).slice(0, 160)}`);
+        }
+      }
+    }
+  }
+  // affectProvider === 'text' -> Layer-1 text affect only (already computed above).
+
+  const affectMeanLatencyMs = affectLatencies.length
+    ? round4(affectLatencies.reduce((a, b) => a + b, 0) / affectLatencies.length)
     : 0;
-  // The real SER output is advisory too: it only enriches affect events, never a warning.
+  // Cloud/GPU affect output is advisory too: it enriches affect events, never a warning.
 
   const n = manifest.cases.length;
   return {
@@ -716,18 +811,23 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
       distressFlaggedSegments: distressFlagged,
       affectAdvisoryInvariantHeld: advisoryInvariantHeld,
       unsupportedClaimCount: unsupported,
-      serModelRan: ser.ok === true,
-      serModel: ser.model ?? SER_MODEL,
-      serDevice: ser.device ?? null,
-      serCuda: ser.cuda ?? false,
-      serSegmentsScored: ser.results?.length ?? 0,
-      serMeanLatencyMs,
-      serSkipReason,
+      affectBackendRequested: requested,
+      affectProvider,
+      openaiKeyPresent: Boolean(openaiKey),
+      elevenlabsKeyPresent: Boolean(elevenKey),
+      ttsProviderUsed,
+      ttsCalls,
+      ttsOk,
+      affectCalls,
+      affectOk,
+      affectMeanLatencyMs,
+      affectErrorCount: affectErrors.length,
+      serDevice,
     },
     note:
-      'Sound-agent summary of the Layer-C reference transcripts drives the SAME deterministic pipeline as live extraction (summarize -> insert -> same warnings). Affect segments are advisory only and never trigger a warning. Layer-1 text affect always runs; Layer-2 is the real on-prem GPU SER model (transformers wav2vec2) over SYNTHETIC audio — this validates execution + GPU latency + advisory flow, NOT emotion accuracy (needs consented/synth speech). OpenAI gpt-4o-audio (primary) + ElevenLabs adapters are wired in soundAgentModels.ts, gated on key+audio.',
-    serDevice: ser.device ?? null,
-    serResultsSample: (ser.results ?? []).slice(0, 6),
+      'Cloud-first affect. auto = OpenAI gpt-4o-audio (primary) -> ElevenLabs Scribe -> Layer-1 text; local GPU sidecar runs ONLY with AFFECT_BACKEND=sidecar. Cloud path: TTS-synthesized speech (OpenAI/ElevenLabs) -> affect model. Affect stays advisory; the summarize->deterministic-warning path (state/record/lifecycle vs gold) is unchanged and above. Keys read from env server-side only.',
+    affectSampleResults,
+    affectErrorsSample: affectErrors.slice(0, 8),
     emittedEventsSample: emittedEvents,
     cases: caseResults,
   };
