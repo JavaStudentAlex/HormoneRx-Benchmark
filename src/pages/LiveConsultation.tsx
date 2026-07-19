@@ -4,6 +4,7 @@ import { Badge, Button, Card, CardBody, CardHeader, CardTitle, cn } from '../com
 import TranscriptPanel from '../components/live/TranscriptPanel';
 import GraphPanel from '../components/live/GraphPanel';
 import ResultPanel from '../components/live/ResultPanel';
+import FleetPanel, { type FleetSummary } from '../components/live/FleetPanel';
 import AnalyzeCase from './AnalyzeCase';
 import { downloadText } from '../lib/exportUtils';
 import { startAudioCapture, type AudioCaptureHandle } from '../lib/audioCapture';
@@ -16,6 +17,8 @@ import {
   type BackendResult,
   type BackendTurn,
   type DemoScript,
+  type FleetFinding,
+  type FleetWorkerStatus,
   type ServerEvent,
 } from '../lib/backendClient';
 
@@ -87,6 +90,9 @@ function LiveSession() {
   const [proposalText, setProposalText] = useState('');
   const [playingScript, setPlayingScript] = useState<string | null>(null);
   const [processingTurn, setProcessingTurn] = useState(false);
+  const [fleetSummary, setFleetSummary] = useState<FleetSummary | null>(null);
+  const [fleetFindings, setFleetFindings] = useState<FleetFinding[]>([]);
+  const [fleetWorkers, setFleetWorkers] = useState<FleetWorkerStatus[]>([]);
 
   const socketRef = useRef<EncounterSocket | null>(null);
   const encounterIdRef = useRef<string | null>(null);
@@ -103,6 +109,13 @@ function LiveSession() {
     backend
       .demoScripts()
       .then((d) => setScripts(d.scripts))
+      .catch(() => undefined);
+    backend
+      .fleetStatus()
+      .then((s) => {
+        setFleetSummary(s);
+        setFleetWorkers(s.workers);
+      })
       .catch(() => undefined);
     return () => {
       stopMicrophone();
@@ -148,6 +161,21 @@ function LiveSession() {
       setCaption({ speaker: event.speaker, text: event.text });
     } else if (event.type === 'processing.error') {
       setErrorBanner(event.detail);
+    } else if (event.type === 'fleet.status') {
+      setFleetSummary({
+        total_workers: event.total_workers,
+        running_workers: event.running_workers,
+        healthy_workers: event.healthy_workers,
+        findings_total: event.findings_total,
+        review_queue_size: event.review_queue_size,
+      });
+      setFleetFindings(event.recent_findings ?? []);
+    } else if (event.type === 'fleet.finding') {
+      setFleetFindings((prev) =>
+        prev.some((f) => f.finding_id === event.finding.finding_id)
+          ? prev
+          : [event.finding, ...prev].slice(0, 12),
+      );
     }
   }, []);
 
@@ -499,6 +527,16 @@ function LiveSession() {
           </CardBody>
         </Card>
       </div>
+
+      {/* Panel 5: always-running agent fleet */}
+      <Card>
+        <CardHeader>
+          <CardTitle>5 · Agent fleet (always-running workers)</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <FleetPanel summary={fleetSummary} findings={fleetFindings} workers={fleetWorkers} />
+        </CardBody>
+      </Card>
     </div>
   );
 }

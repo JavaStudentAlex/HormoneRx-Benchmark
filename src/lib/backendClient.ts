@@ -91,6 +91,42 @@ export interface DemoScript {
   turns: { speaker: string; text: string }[];
 }
 
+export interface FleetFinding {
+  finding_id: string;
+  worker_id: string;
+  worker_name: string;
+  encounter_id: string | null;
+  severity: 'info' | 'attention' | 'alert';
+  kind: string;
+  message: string;
+  created_at: string;
+}
+
+export interface FleetWorkerStatus {
+  id: string;
+  name: string;
+  tier: number;
+  cadence: string;
+  agentic: boolean;
+  enabled: boolean;
+  disabled_reason: string | null;
+  description: string;
+  status: string;
+  runs: number;
+  errors: number;
+  findings: number;
+  proposals_applied: number;
+}
+
+export interface FleetStatus {
+  total_workers: number;
+  running_workers: number;
+  healthy_workers: number;
+  findings_total: number;
+  review_queue_size: number;
+  workers: FleetWorkerStatus[];
+}
+
 async function json<T>(response: Response): Promise<T> {
   if (!response.ok) throw new Error(`backend ${response.status}: ${await response.text()}`);
   return response.json() as Promise<T>;
@@ -109,6 +145,7 @@ export const backend = {
     fetch(`/api/encounters/${encounterId}/demo-script/${scriptId}`, { method: 'POST' }).then((r) => json(r)),
   audit: (encounterId: string) => fetch(`/api/encounters/${encounterId}/audit`).then((r) => json<object>(r)),
   mintRealtimeSession: () => fetch('/api/realtime/session', { method: 'POST' }).then((r) => json<object>(r)),
+  fleetStatus: () => fetch('/api/fleet/status').then((r) => json<FleetStatus>(r)),
 };
 
 export type ServerEvent =
@@ -119,7 +156,18 @@ export type ServerEvent =
   | { type: 'warning.created' | 'warning.updated' | 'warning.retracted'; warning: BackendWarning }
   | { type: 'result.processing'; turn_id: string; speaker: string }
   | { type: 'processing.error'; detail: string }
-  | { type: 'event.duplicate'; event_id: string };
+  | { type: 'event.duplicate'; event_id: string }
+  | { type: 'fleet.finding'; finding: FleetFinding }
+  | {
+      type: 'fleet.status';
+      total_workers: number;
+      running_workers: number;
+      healthy_workers: number;
+      findings_total: number;
+      review_queue_size: number;
+      recent_findings: FleetFinding[];
+    }
+  | { type: 'relay.state'; state: string; detail: string };
 
 export class EncounterSocket {
   private ws: WebSocket | null = null;
