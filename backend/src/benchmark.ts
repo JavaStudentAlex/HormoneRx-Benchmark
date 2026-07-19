@@ -22,6 +22,14 @@ import { DuplicateEventError, EncounterService } from './encounterService.ts';
 import { EvidenceIndex, pairKey } from './evidenceIndex.ts';
 import { type DistressFlag, Speaker, activeWarnings, newId } from './models.ts';
 import { SoundAgent } from './soundAgent.ts';
+import {
+  SER_MODEL,
+  SER_PYTHON,
+  type SerResponse,
+  type SerSegmentInput,
+  runSidecarSer,
+  serSidecarAvailable,
+} from './soundAgentModels.ts';
 import { NO_MATCH_PRIMARY, NO_MATCH_SECONDARY } from './warningEngine.ts';
 
 const REPO_DIR = path.resolve(BACKEND_DIR, '..');
@@ -579,6 +587,7 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
   let advisoryInvariantHeld = true;
   const emittedEvents: Array<Record<string, unknown>> = [];
   const caseResults: Array<Record<string, unknown>> = [];
+  const serInputs: SerSegmentInput[] = [];
 
   for (const testCase of manifest.cases) {
     const service = buildService();
@@ -605,6 +614,7 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
       });
       affectSegments++;
       caseAffectIds.add(affect.segment_id);
+      serInputs.push({ segment_id: affect.segment_id, transcript: turn.text, audio_path: null });
       if (affect.distress_flag.level !== 'none') distressFlagged++;
       turnsForRelational.push({ speaker: turn.speaker as Speaker, text: turn.text, distress: affect.distress_flag });
       emittedEvents.push({
@@ -678,6 +688,21 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
     });
   }
 
+  // Layer 2 — run the real on-prem GPU SER model over the segments (once).
+  let ser: SerResponse = { ok: false, error: 'not attempted' };
+  let serSkipReason: string | null = null;
+  if (serSidecarAvailable()) {
+    ser = runSidecarSer(serInputs);
+    if (!ser.ok) serSkipReason = ser.error ?? 'sidecar returned ok:false';
+  } else {
+    serSkipReason = `SER sidecar unavailable (need ${SER_PYTHON} + backend/ser/infer.py + deps)`;
+  }
+  const serLatencies = ser.ok && ser.results ? ser.results.map((r) => r.latency_ms) : [];
+  const serMeanLatencyMs = serLatencies.length
+    ? round4(serLatencies.reduce((a, b) => a + b, 0) / serLatencies.length)
+    : 0;
+  // The real SER output is advisory too: it only enriches affect events, never a warning.
+
   const n = manifest.cases.length;
   return {
     layer: 'E-soundagent',
@@ -691,9 +716,18 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
       distressFlaggedSegments: distressFlagged,
       affectAdvisoryInvariantHeld: advisoryInvariantHeld,
       unsupportedClaimCount: unsupported,
+      serModelRan: ser.ok === true,
+      serModel: ser.model ?? SER_MODEL,
+      serDevice: ser.device ?? null,
+      serCuda: ser.cuda ?? false,
+      serSegmentsScored: ser.results?.length ?? 0,
+      serMeanLatencyMs,
+      serSkipReason,
     },
     note:
-      'Sound-agent summary of the Layer-C reference transcripts drives the SAME deterministic pipeline as live extraction (summarize -> insert -> same warnings). Affect segments are advisory only and never trigger a warning. Layer-1 text-only affect; no GPU SER model or audio in this run.',
+      'Sound-agent summary of the Layer-C reference transcripts drives the SAME deterministic pipeline as live extraction (summarize -> insert -> same warnings). Affect segments are advisory only and never trigger a warning. Layer-1 text affect always runs; Layer-2 is the real on-prem GPU SER model (transformers wav2vec2) over SYNTHETIC audio — this validates execution + GPU latency + advisory flow, NOT emotion accuracy (needs consented/synth speech). OpenAI gpt-4o-audio (primary) + ElevenLabs adapters are wired in soundAgentModels.ts, gated on key+audio.',
+    serDevice: ser.device ?? null,
+    serResultsSample: (ser.results ?? []).slice(0, 6),
     emittedEventsSample: emittedEvents,
     cases: caseResults,
   };
