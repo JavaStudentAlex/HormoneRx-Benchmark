@@ -162,3 +162,91 @@ export class ProviderRelay {
     }
   }
 }
+
+export type RelayState = 'connecting' | 'connected' | 'reconnecting' | 'closed' | 'gave_up';
+
+/**
+ * Long-session supervision for the relay: when the provider closes its socket
+ * mid-consultation (session cap, network blip), reconnect with exponential
+ * backoff instead of silently going deaf. Audio sent while disconnected is
+ * dropped and counted — never silently pretended to be transcribed.
+ */
+export class RelaySupervisor {
+  private relay: ProviderRelay | null = null;
+  private stopped = false;
+  reconnects = 0;
+  droppedAudioFrames = 0;
+
+  constructor(
+    private settings: Settings,
+    private onPartial: ((text: string) => void | Promise<void>) | null,
+    private onFinal: ((itemId: string | null, text: string) => void | Promise<void>) | null,
+    private options: {
+      maxAttempts?: number;
+      backoffMs?: number;
+      sleep?: (ms: number) => Promise<void>;
+      onStateChange?: (state: RelayState, detail: string) => void;
+    } = {},
+  ) {}
+
+  private notify(state: RelayState, detail: string): void {
+    this.options.onStateChange?.(state, detail);
+  }
+
+  /**
+   * Connect and keep pumping provider events until stop() is called or the
+   * reconnect budget is exhausted. Resolves when the relay is finished.
+   */
+  async run(connectImpl?: ProviderConnect): Promise<void> {
+    const maxAttempts = this.options.maxAttempts ?? 5;
+    const backoffMs = this.options.backoffMs ?? 1000;
+    const sleep = this.options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+    let attempt = 0;
+    while (!this.stopped) {
+      const relay = new ProviderRelay(this.settings, this.onPartial, this.onFinal);
+      try {
+        this.notify(attempt === 0 ? 'connecting' : 'reconnecting', `attempt ${attempt + 1}`);
+        await relay.connect(connectImpl);
+      } catch (err) {
+        attempt += 1;
+        if (attempt >= maxAttempts || this.stopped) {
+          this.notify('gave_up', `provider unreachable after ${attempt} attempt(s)`);
+          throw err;
+        }
+        await sleep(backoffMs * 2 ** (attempt - 1));
+        continue;
+      }
+      this.relay = relay;
+      if (attempt > 0) this.reconnects += 1;
+      attempt = 0;
+      this.notify('connected', 'provider socket open');
+      await relay.pump(); // resolves when the provider closes the socket
+      this.relay = null;
+      if (this.stopped) break;
+      if (this.reconnects >= maxAttempts) {
+        this.notify('gave_up', `provider closed; reconnect budget (${maxAttempts}) exhausted`);
+        return;
+      }
+      this.notify('reconnecting', 'provider closed the socket');
+      await sleep(backoffMs);
+      attempt = 1; // subsequent connect() notifications read as reconnecting
+    }
+    this.notify('closed', 'relay stopped');
+  }
+
+  async sendAudio(pcm16: Buffer | Uint8Array): Promise<void> {
+    if (!this.relay) {
+      this.droppedAudioFrames += 1;
+      return;
+    }
+    await this.relay.sendAudio(pcm16);
+  }
+
+  async stop(): Promise<void> {
+    this.stopped = true;
+    if (this.relay) {
+      await this.relay.close();
+      this.relay = null;
+    }
+  }
+}

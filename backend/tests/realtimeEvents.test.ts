@@ -6,7 +6,14 @@ import { describe, expect, it } from 'vitest';
 
 import { defaultSettings } from '../src/config.ts';
 import { EventType, activeWarnings } from '../src/models.ts';
-import { ProviderRelay, RealtimeSessionError, mintClientSecret } from '../src/realtimeSession.ts';
+import {
+  ProviderRelay,
+  RealtimeSessionError,
+  RelaySupervisor,
+  mintClientSecret,
+  type ProviderSocket,
+  type RelayState,
+} from '../src/realtimeSession.ts';
 import { makeService, say } from './helpers.ts';
 
 describe('realtime events', () => {
@@ -85,5 +92,85 @@ describe('realtime events', () => {
     await expect(mintClientSecret(defaultSettings({ openai_api_key: null }))).rejects.toThrow(
       RealtimeSessionError,
     );
+  });
+});
+
+/** Fake provider socket for supervised-relay tests. */
+class FakeProviderSocket implements ProviderSocket {
+  private listeners = new Map<string, Array<(arg?: unknown) => void>>();
+  sent: string[] = [];
+
+  send(data: string): void {
+    this.sent.push(data);
+  }
+
+  close(): void {
+    this.emit('close');
+  }
+
+  on(event: string, listener: (arg?: unknown) => void): void {
+    this.listeners.set(event, [...(this.listeners.get(event) ?? []), listener]);
+  }
+
+  emit(event: string, arg?: unknown): void {
+    for (const listener of this.listeners.get(event) ?? []) listener(arg);
+  }
+}
+
+const tick = async (): Promise<void> => {
+  for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+};
+
+describe('relay supervision (long-session reconnect)', () => {
+  const liveSettings = defaultSettings({ openai_api_key: 'sk-test' });
+
+  it('reconnects when the provider closes the socket mid-session', async () => {
+    const sockets: FakeProviderSocket[] = [];
+    const connect = async (): Promise<ProviderSocket> => {
+      const s = new FakeProviderSocket();
+      sockets.push(s);
+      return s;
+    };
+    const states: RelayState[] = [];
+    const supervisor = new RelaySupervisor(liveSettings, null, null, {
+      backoffMs: 1,
+      sleep: async () => {},
+      onStateChange: (state) => states.push(state),
+    });
+    const done = supervisor.run(connect);
+    await tick();
+    expect(sockets).toHaveLength(1);
+
+    sockets[0].emit('close'); // provider drops the session
+    await tick();
+    expect(sockets).toHaveLength(2); // reconnected
+    expect(supervisor.reconnects).toBe(1);
+    expect(states).toContain('reconnecting');
+
+    await supervisor.stop();
+    await done;
+    expect(states[states.length - 1]).toBe('closed');
+    expect(states.filter((s) => s === 'connected')).toHaveLength(2);
+  });
+
+  it('drops (and counts) audio sent while disconnected instead of pretending', async () => {
+    const supervisor = new RelaySupervisor(liveSettings, null, null, {});
+    await supervisor.sendAudio(Buffer.from([1, 2, 3]));
+    expect(supervisor.droppedAudioFrames).toBe(1);
+  });
+
+  it('gives up after the reconnect budget is exhausted', async () => {
+    const states: RelayState[] = [];
+    const supervisor = new RelaySupervisor(liveSettings, null, null, {
+      maxAttempts: 2,
+      backoffMs: 1,
+      sleep: async () => {},
+      onStateChange: (state) => states.push(state),
+    });
+    const failingConnect = async (): Promise<ProviderSocket> => {
+      throw new Error('network down');
+    };
+    await expect(supervisor.run(failingConnect)).rejects.toThrow('network down');
+    expect(states[states.length - 1]).toBe('gave_up');
   });
 });
