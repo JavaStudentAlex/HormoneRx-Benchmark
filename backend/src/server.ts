@@ -360,6 +360,22 @@ export function createBackend(settings: Settings = getSettings()): Backend {
     res.json({ status: 'playing', script_id: script.id, turns: script.turns.length });
   });
 
+  // -- static frontend (single-service deploy: serve built dist/) ----------
+  // Enabled when dist/ exists (i.e. after `npm run build`); disable with
+  // SERVE_STATIC=false. Hash-based routing keeps the SPA fallback trivial.
+
+  const distDir = path.resolve(BACKEND_DIR, '..', 'dist');
+  if ((process.env.SERVE_STATIC ?? 'true') !== 'false' && existsSync(distDir)) {
+    app.use(express.static(distDir));
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' || req.path.startsWith('/api') || req.path.startsWith('/ws')) {
+        next();
+        return;
+      }
+      res.sendFile(path.join(distDir, 'index.html'));
+    });
+  }
+
   // -- WebSockets (spec §21.3) ---------------------------------------------
 
   const server = http.createServer(app);

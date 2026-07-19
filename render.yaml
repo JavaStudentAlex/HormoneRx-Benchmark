@@ -1,0 +1,48 @@
+# Render deploy — HormoneRx Benchmark (single web service)
+# Backend (Express + ws) serves the built frontend from dist/ on the same
+# origin, which is what the frontend expects (window.location.host for /api + /ws).
+services:
+  - type: web
+    name: hormonerx-benchmark
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npx tsx backend/src/server.ts
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # MUST be 0.0.0.0 on Render — server defaults to 127.0.0.1 (unreachable).
+      - key: HOST
+        value: 0.0.0.0
+      # NOT "production": production forces the pending-verification override
+      # off, and with all six records awaiting physician sign-off NO warnings
+      # would ever fire — a dead demo. Warnings carry the visible
+      # "physician sign-off pending" badge instead. After sign-off
+      # (physicianVerified: true), switch this to production.
+      - key: APP_ENV
+        value: development
+      - key: DEMO_MODE
+        value: "true"
+      - key: EVIDENCE_ALLOW_PENDING_VERIFICATION
+        value: "true"
+      - key: EXTRACTION_FALLBACK_DETERMINISTIC
+        value: "true"
+      - key: STRICT_EVIDENCE_VALIDATION
+        value: "true"
+      - key: STORE_RAW_AUDIO
+        value: "false"
+      - key: STORE_TRANSCRIPTS
+        value: "false"
+      - key: FLEET_ENABLED
+        value: "true"
+      - key: FLEET_WASHOUT_SENTINEL
+        value: "false"
+      - key: FLEET_LINK_CHECK
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      # Live mic transcription + model extraction. Set in the Render dashboard
+      # (Environment tab) — never commit. Scripted demo works without it.
+      - key: OPENAI_API_KEY
+        sync: false
