@@ -49,3 +49,32 @@ auto-resolve to the combined pill.
 - [ ] Derived hormonal-concept mappings approved (INT-001/002/005)
 - [ ] Closed-class member lists approved (INT-003/004/006)
 - [ ] "the pill" ambiguity behavior approved
+
+---
+
+# Addendum v0.4.0 — proposed fleet behavior: washout-window sentinel
+
+While building the agent fleet (docs/FLEET.md) we found a blind spot in the current
+engine that your own records describe:
+
+- INT-001, INT-003, INT-004 state the contraceptive is not recommended during use of the
+  enzyme inducer **"and for 28 days after stopping it"**.
+- INT-006 states elevated enzyme levels **"can persist for up to 4 weeks after"** the
+  enzyme-inducing medicine is stopped.
+- But when a patient says "I stopped carbamazepine last month", the engine classifies
+  the medication as historical context and **retracts** the warning.
+
+**Proposed behavior (worker w08, currently DISABLED):** when a patient assertion of an
+enzyme-inducer concept is historical/negated while a hormonal product is active or
+planned, emit an advisory finding that quotes the record's verbatim persistence
+sentence and asks exactly when the medication was stopped. It creates **no warning**,
+changes **no assertion**, and never alters the result state — it only asks the timing
+question the records make relevant.
+
+The worker stays off until you approve it (`FLEET_WASHOUT_SENTINEL=true`, development
+only; forced off in production). A stronger behavior (keeping the warning active inside
+a stated 28-day window) would need your explicit sign-off on wording and logic first.
+
+- [ ] Advisory washout-window finding approved (enable the worker)
+- [ ] OR: stronger behavior desired (specify) 
+- [ ] OR: rejected (worker stays disabled)

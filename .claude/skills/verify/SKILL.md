@@ -31,4 +31,6 @@ Health check: `curl localhost:8000/api/health` and `curl localhost:5173/api/heal
 4. **Clear encounter** resets all panels.
 5. Text tab (`#/live?tab=text`) works with the backend down.
 
-Backend-only checks: `npm run backend:test` (96 Vitest tests, includes real HTTP+WS API tests) and `npm run benchmark:backend` (writes real results; audio layer reports SKIPPED without recordings/key).
+6. **Agent fleet panel** ("5 · Agent fleet"): shows "15/15 workers healthy · 17 registered"; "Show roster" lists all workers incl. the disabled washout sentinel; findings appear live (e.g. "the pill" → Ambiguity sentinel; combined pill + lamotrigine → Seizure-risk specialist alert). REST: `GET /api/fleet/status`, `/api/fleet/findings`, `/api/fleet/review-queue`, `POST /api/fleet/run`.
+
+Backend-only checks: `npm run backend:test` (121 Vitest tests: engine + fleet incl. parity/error isolation + relay reconnect, real HTTP+WS API tests) and `npm run benchmark:backend` (writes real results; audio layer reports SKIPPED without recordings/key). Benchmarks run the baseline engine; fleet parity is asserted in `backend/tests/fleet.test.ts`.

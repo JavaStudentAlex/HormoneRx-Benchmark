@@ -11,6 +11,7 @@ The project is an audio-first, event-sourced **realtime engine** (v0.3.0: the wh
 - **Evidence dataset** (`backend/data/evidence_records.json`) — six source-linked interaction records between hormonal contraceptives and interacting medications (FSRH, CDC US-MEC, FDA lamotrigine label, MHRA), now with machine-matching metadata: explicit concept IDs, closed-class membership lists, and interaction-direction codes. Every medical statement is a close paraphrase of the cited source; v0.2.0 changed **no medical prose**.
 - **Deterministic ontology** (`backend/data/synonym_index.json`) — approved synonyms, documented misspellings, and deliberately **ambiguous** aliases ("the pill", class words) that force abstention instead of guessing.
 - **Realtime encounter engine** (`backend/`) — TypeScript (Node + Express + ws), append-only event log, derived graph snapshot, graph invariant validation, deterministic pair lookup, and a full warning lifecycle (create → update → **retract with reason**). Partial captions are display-only and can never trigger anything.
+- **Agent fleet** (`backend/src/fleet/`, v0.4.0) — 17 always-registered worker instances (15 running by default) over the same event log: cross-turn big-picture extraction, contradiction hunting, subject/ambiguity auditing, danger-condition specialists (seizure-risk/lamotrigine, potent inducers, hidden herbal inducers, per-hormone watchers), and continuous database checking (independent invariant replay, source-link drift monitoring, coverage-gap mining into a physician review queue, watchdog with a deterministic canary). Workers only quote record text verbatim and only feed the ordinary reducer — they can never author medical content, create warnings directly, or edit the dataset. See [`docs/FLEET.md`](docs/FLEET.md).
 - **Benchmarks** —
   Layer A: 24 labelled text snippets; Layer B: 13 streaming sequences with an expected state after **every** event (corrections, negations, late/out-of-order events, duplicate replays, proposal lifecycle); Layer C: frozen audio manifest + gold labels (execution requires recordings and a transcription key — reported honestly as skipped until then).
 - **Web app** — the existing React/Tailwind app plus a **Live Consultation** page: session controls with consent notice, speaker selector (D/P shortcuts), live transcript with provisional captions, encounter-graph panel with a superseded-assertion audit drawer, and an evidence panel with provenance chains and warning history. Old Analyze Case lives on as the offline **Text analysis** tab.
@@ -33,7 +34,7 @@ Open **http://localhost:5173/#/live** → *Start listening* → play a scripted 
 Other commands:
 
 ```bash
-npm run backend:test        # 96 backend tests (Vitest)
+npm run backend:test        # 121 backend tests (Vitest), incl. fleet + relay-reconnect
 npm run test                # 38 frontend tests (Vitest)
 npm run benchmark:backend   # Layers A+B+C -> backend/data/benchmark_results.json
 npm run benchmark           # legacy TS text benchmark (frontend demo pipeline)
@@ -45,6 +46,7 @@ npm run typecheck && npm run build
 | Path | Purpose |
 | --- | --- |
 | `backend/src/` | Realtime engine (TypeScript): models, event store, graph reducer/validator, evidence index, normalizer, extractors, warning engine, benchmark runner, Express + ws API/WS server |
+| `backend/src/fleet/` | Agent fleet: supervisor, worker contract, tier 1–3 workers (see `docs/FLEET.md`) |
 | `backend/data/` | Canonical evidence + ontology + demo scripts + benchmark gold labels + generated results |
 | `backend/tests/` | Evidence, normalization, context, graph, warning-lifecycle, realtime, API tests |
 | `src/` | React app (Live Consultation, Evidence Library, Benchmark, About) |
@@ -53,7 +55,7 @@ npm run typecheck && npm run build
 
 ## Documentation
 
-[`docs/REALTIME_ARCHITECTURE.md`](docs/REALTIME_ARCHITECTURE.md) · [`docs/GRAPH_SCHEMA.md`](docs/GRAPH_SCHEMA.md) · [`docs/LABELING_GUIDE.md`](docs/LABELING_GUIDE.md) · [`docs/DATASET_CARD.md`](docs/DATASET_CARD.md) · [`docs/BENCHMARK_CARD.md`](docs/BENCHMARK_CARD.md) · [`docs/AUDIO_BENCHMARK_CARD.md`](docs/AUDIO_BENCHMARK_CARD.md) · [`docs/EVALUATION.md`](docs/EVALUATION.md) · [`docs/SAFETY.md`](docs/SAFETY.md) · [`docs/PRIVACY.md`](docs/PRIVACY.md) · [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) · [`docs/DEMO_GUIDE.md`](docs/DEMO_GUIDE.md) · [`VERIFICATION_TABLE.md`](VERIFICATION_TABLE.md) (physician sign-off) · [`MORNING_REVIEW.md`](MORNING_REVIEW.md) (what actually ran)
+[`docs/REALTIME_ARCHITECTURE.md`](docs/REALTIME_ARCHITECTURE.md) · [`docs/FLEET.md`](docs/FLEET.md) · [`docs/GRAPH_SCHEMA.md`](docs/GRAPH_SCHEMA.md) · [`docs/LABELING_GUIDE.md`](docs/LABELING_GUIDE.md) · [`docs/DATASET_CARD.md`](docs/DATASET_CARD.md) · [`docs/BENCHMARK_CARD.md`](docs/BENCHMARK_CARD.md) · [`docs/AUDIO_BENCHMARK_CARD.md`](docs/AUDIO_BENCHMARK_CARD.md) · [`docs/EVALUATION.md`](docs/EVALUATION.md) · [`docs/SAFETY.md`](docs/SAFETY.md) · [`docs/PRIVACY.md`](docs/PRIVACY.md) · [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) · [`docs/DEMO_GUIDE.md`](docs/DEMO_GUIDE.md) · [`VERIFICATION_TABLE.md`](VERIFICATION_TABLE.md) (physician sign-off) · [`MORNING_REVIEW.md`](MORNING_REVIEW.md) (what actually ran)
 
 ## Current results (deterministic demo pipeline — harness validation, not clinical accuracy)
 

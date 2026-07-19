@@ -1,7 +1,23 @@
-# Morning Review — HormoneRx v0.3.0 (TypeScript end to end)
+# Morning Review — HormoneRx v0.4.0 (agent fleet)
 
 Everything below was actually run during the build. Do not trust this self-report alone —
 the 5-point spot-check takes ~3 minutes.
+
+**v0.4.0 — the agent fleet** (`docs/FLEET.md`): 17 always-registered worker instances
+(15 running by default) over the encounter event log — big-picture cross-turn
+extraction, contradiction hunting, subject/ambiguity auditing, danger-condition
+specialists (seizure-risk, potent inducers, hidden herbal inducers, 4 per-hormone
+watchers), independent invariant replay, source-drift monitoring, coverage-gap mining
+into a **physician review queue**, and a watchdog with a deterministic canary. Plus:
+the live audio relay now auto-reconnects with backoff when the provider drops the
+socket. Fleet parity is tested: with the fleet attached, every gold-labeled behavior
+of the baseline engine is unchanged. New Live Consultation panel "5 · Agent fleet"
+shows health + findings in realtime.
+
+**Needs your decision** (VERIFICATION_TABLE.md, addendum v0.4.0): the records say
+enzyme-inducer risk persists **28 days / 4 weeks after stopping**, but the engine
+retracts warnings on "I stopped it last month". A washout-window sentinel (advisory
+question only, no warning changes) is built and **disabled** until you sign it off.
 
 **v0.3.0**: the Python (FastAPI) backend was ported 1:1 to TypeScript (Node + Express + ws)
 so the whole project is one language. Same routes, same WS protocol, same JSON wire
@@ -26,7 +42,7 @@ npm run test && npm run typecheck && npm run build   # frontend + backend typech
 
 | Step | Command | Result |
 | --- | --- | --- |
-| Backend tests | `npm run backend:test` | **96 passed / 96** (evidence, normalization, context, graph, warning lifecycle, realtime events, API+WS against a real listening server) |
+| Backend tests | `npm run backend:test` | **121 passed / 121** (the original 96 + 22 fleet tests incl. parity/error-isolation + 3 relay-reconnect tests) |
 | Frontend tests | `vitest run` | **38 passed / 38** |
 | Typecheck (frontend + backend) | `npm run typecheck` | **Pass** |
 | Production build | `vite build` | **Success** (286 kB JS / 80 kB gzip) |
@@ -34,6 +50,7 @@ npm run test && npm run typecheck && npm run build   # frontend + backend typech
 | Benchmark Layer B (streaming, 13 sequences) | same | **13/13**, per-event state accuracy 100%, retraction accuracy 100%, premature warnings 0, duplicate warnings 0 |
 | Benchmark Layer C (audio) | same | **SKIPPED — honestly**: no recordings, no API key. Manifest + gold labels frozen. |
 | End-to-end UI vs TS backend (Playwright, real browser against both servers) | scripted drive of `#/live` | **15/15 checks**, 0 console errors (warning create/retract, conflict notes, proposal lifecycle, Demo 2 replay) |
+| End-to-end UI, agent fleet (v0.4.0, real browser) | scripted drive of `#/live` | **14/14 checks**, 0 console errors (fleet panel 15/15 healthy, roster incl. disabled washout, ambiguity finding, INT-005 + seizure-risk alert escalation, supplement finding); screenshot `screenshots/desktop-12-agent-fleet.png` |
 | End-to-end UI, v0.2.x runs (Python engine, same wire format) | scripted drive of `#/live` | 23/23 + 5/5 checks; screenshots `screenshots/desktop-08..11-*.png` |
 
 Backend processing latency over the streaming benchmark: median 0.6 ms, p90 ~1 ms per

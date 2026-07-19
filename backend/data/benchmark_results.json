@@ -5,7 +5,7 @@
     "engine": "hormonerx-backend-ts/0.3.0",
     "extractionModel": "deterministic-rule-extractor/0.2.0",
     "mode": "demo-deterministic",
-    "evalTimestamp": "2026-07-19T06:12:07.314Z",
+    "evalTimestamp": "2026-07-19T06:54:01.604Z",
     "deterministic": true,
     "runtimeEligibleRecords": [
       "INT-001",
@@ -340,9 +340,9 @@
       },
       "processingLatency": {
         "samples": 53,
-        "medianMs": 0.16,
-        "p90Ms": 0.34,
-        "maxMs": 4.12,
+        "medianMs": 0.15,
+        "p90Ms": 0.37,
+        "maxMs": 4.07,
         "note": "Backend pipeline only (final transcript received -> result computed), deterministic extractor, no network. Live-mode model latency is not included and must be measured separately."
       },
       "cases": [
