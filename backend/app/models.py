@@ -309,6 +309,7 @@ class EncounterSnapshot(BaseModel):
     lookup_reason: str = "No finalized medication context has been analyzed yet."
     missing_information: list[str] = Field(default_factory=list)
     excluded_notes: list[str] = Field(default_factory=list)
+    conflict_notes: list[str] = Field(default_factory=list)
     messages: list[str] = Field(default_factory=list)
     latencies: list[TurnLatency] = Field(default_factory=list)
 

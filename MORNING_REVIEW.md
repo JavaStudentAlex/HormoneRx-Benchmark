@@ -21,12 +21,12 @@ npm run test && npm run typecheck && npm run build   # frontend
 
 | Step | Command | Result |
 | --- | --- | --- |
-| Backend tests | `pytest` | **91 passed / 91** (evidence, normalization, context, graph, warning lifecycle, realtime events, API+WS) |
+| Backend tests | `pytest` | **96 passed / 96** (evidence, normalization, context, graph, warning lifecycle, realtime events, API+WS) |
 | Frontend tests | `vitest run` | **38 passed / 38** |
 | Typecheck | `tsc --noEmit` | **Pass** |
 | Production build | `vite build` | **Success** (285 kB JS / 80 kB gzip) |
-| Benchmark Layer A (text, 23 cases) | `python -m app.benchmark` | **23/23**, trigger P/R/F1 100%, citation coverage 100%, unsupported claims 0 |
-| Benchmark Layer B (streaming, 10 sequences) | same | **10/10**, per-event state accuracy 100%, retraction accuracy 100%, premature warnings 0, duplicate warnings 0 |
+| Benchmark Layer A (text, 24 cases) | `python -m app.benchmark` | **24/24**, trigger P/R/F1 100%, citation coverage 100%, unsupported claims 0 |
+| Benchmark Layer B (streaming, 13 sequences) | same | **13/13**, per-event state accuracy 100%, retraction accuracy 100%, premature warnings 0, duplicate warnings 0 |
 | Benchmark Layer C (audio) | same | **SKIPPED — honestly**: no recordings, no API key. Manifest + gold labels frozen. |
 | End-to-end UI (Playwright, real browser against both servers) | scripted drive of `#/live` | **23/23 checks**, 0 console errors; screenshots `screenshots/desktop-08..10-live-*.png` |
 
@@ -44,6 +44,12 @@ turn (deterministic extractor, no network). Live-model latency is **unmeasured**
    INT-005 warning (reversed direction); cancel → visible retraction.
 4. Speaker shortcuts D/P; `/analyze` redirects to the text tab; the text tab works with
    the backend stopped.
+5. Improvement pass (v0.2.1), also driven live in the browser: negate→re-affirm
+   flip-flop re-warns immediately with the contradiction surfaced in the new
+   "Contradictions resolved by later statements" panel; "Sorry, I meant the combined
+   pill" switches the warning INT-003→INT-001 with visible retraction; "considering
+   starting the combined pill" while on carbamazepine raises the proposed-context
+   warning at consideration time (screenshot `screenshots/desktop-11-conflict-notes.png`).
 
 ## NOT verified (be aware before the live demo)
 

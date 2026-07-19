@@ -52,7 +52,8 @@ class GraphState:
         self.assertions: dict[str, GraphAssertion] = {}
         self.proposals: dict[str, PrescriptionProposal] = {}
         self.supersession_events: list[dict] = []
-        self.contradiction_notes: list[str] = []
+        self.contradiction_notes: list[str] = []  # unresolved -> abstain
+        self.conflict_notes: list[str] = []  # resolved polarity flips -> informational
         self.status: str = "created"
         self.started_at: datetime | None = None
         self.stopped_at: datetime | None = None
@@ -198,18 +199,23 @@ class EncounterGraphReducer:
                 normalization_method=nm.normalization_method,
             )
 
-        # Explicit corrections: "sorry, I meant lamotrigine" supersedes the most
-        # recent prior active medication assertion for a different concept.
+        # Explicit corrections: "sorry, I meant lamotrigine" / "I meant the combined
+        # pill" supersede the most recent prior active assertion of the SAME category
+        # for a different concept.
         for correction in corrections:
             replacement_surface = (correction.get("replacement_surface_text") or "").lower()
             if not replacement_surface:
                 continue
             replacement_concept = self.index.alias_to_medication.get(replacement_surface)
+            replacement_category = MentionCategory.OTHER_MEDICATION
+            if not replacement_concept:
+                replacement_concept = self.index.alias_to_hormonal.get(replacement_surface)
+                replacement_category = MentionCategory.HORMONAL_PRODUCT
             if not replacement_concept:
                 continue
             candidates = [
                 a for a in state.active()
-                if a.category == MentionCategory.OTHER_MEDICATION
+                if a.category == replacement_category
                 and a.subject == SubjectRole.PATIENT
                 and a.concept_id != replacement_concept
                 and a.source_turn_id != turn.turn_id
@@ -238,6 +244,10 @@ class EncounterGraphReducer:
                     "reason": "explicit correction",
                     "turn_id": turn.turn_id,
                 }
+            )
+            replacement_name = self.index.ontology.canonical_name(replacement_concept)
+            state.conflict_notes.append(
+                f"{turn.turn_id} corrected the earlier statement: {target.canonical_name} → {replacement_name}."
             )
             if replacement_assertion:
                 state.assertions[replacement_assertion.assertion_id] = replacement_assertion.model_copy(
@@ -279,6 +289,15 @@ class EncounterGraphReducer:
                     "turn_id": assertion.source_turn_id,
                 }
             )
+            # A polarity flip (current -> negated/historical, negated -> current, …)
+            # is a resolved contradiction: the later statement wins, but the flip is
+            # surfaced instead of silently applied.
+            if previous.status != assertion.status and assertion.subject == SubjectRole.PATIENT:
+                state.conflict_notes.append(
+                    f"{assertion.source_turn_id} contradicts the earlier statement about "
+                    f"{assertion.canonical_name} ({previous.status.value} → {assertion.status.value}); "
+                    f"the later statement is used."
+                )
         state.assertions[assertion.assertion_id] = assertion
 
 
@@ -287,11 +306,15 @@ class EncounterGraphReducer:
 # ---------------------------------------------------------------------------
 
 def eligible_pairs(state: GraphState, index: EvidenceIndex) -> list[tuple[GraphAssertion, GraphAssertion, WarningContext]]:
+    # Danger-moment extension beyond spec §16.5 literal: a PLANNED hormonal product
+    # with a current medication is checked as a proposed combination (spec §15.4
+    # spirit — "planned may be checked"), so the warning appears at the moment the
+    # prescription is being considered, not after it is issued.
     hormonal_active = [
         a for a in state.active()
         if a.subject == SubjectRole.PATIENT
         and a.category == MentionCategory.HORMONAL_PRODUCT
-        and a.predicate == Predicate.CURRENTLY_USES
+        and a.predicate in (Predicate.CURRENTLY_USES, Predicate.PLANS_TO_TAKE)
         and a.concept_id in index.ontology.hormonal_concepts
     ]
     medication_active = [
@@ -306,7 +329,7 @@ def eligible_pairs(state: GraphState, index: EvidenceIndex) -> list[tuple[GraphA
         for m in medication_active:
             context = (
                 WarningContext.PROPOSED_COMBINATION
-                if m.predicate == Predicate.PLANS_TO_TAKE
+                if Predicate.PLANS_TO_TAKE in (m.predicate, h.predicate)
                 else WarningContext.ACTIVE_COMBINATION
             )
             pairs.append((h, m, context))

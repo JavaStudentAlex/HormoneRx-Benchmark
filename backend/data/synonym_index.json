@@ -163,6 +163,13 @@
       "missingInformation": "A drug-class word (barbiturates) was mentioned without a specific medication name."
     }
   },
+  "mutuallyExclusiveGroups": {
+    "oral_pill": [
+      "combined_hormonal_contraceptive",
+      "progestogen_only_pill",
+      "estrogen_containing_oral_contraceptive"
+    ]
+  },
   "nonInteractingMedications": [
     "paracetamol",
     "acetaminophen",

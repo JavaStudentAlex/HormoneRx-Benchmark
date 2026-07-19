@@ -86,6 +86,7 @@ function LiveSession() {
   const [manualText, setManualText] = useState('');
   const [proposalText, setProposalText] = useState('');
   const [playingScript, setPlayingScript] = useState<string | null>(null);
+  const [processingTurn, setProcessingTurn] = useState(false);
 
   const socketRef = useRef<EncounterSocket | null>(null);
   const encounterIdRef = useRef<string | null>(null);
@@ -139,6 +140,9 @@ function LiveSession() {
       setCaption(null);
     } else if (event.type === 'result.updated') {
       setResult(event.result);
+      setProcessingTurn(false);
+    } else if (event.type === 'result.processing') {
+      setProcessingTurn(true);
     } else if (event.type === 'caption.updated') {
       if (!event.provisional) return;
       setCaption({ speaker: event.speaker, text: event.text });
@@ -485,7 +489,13 @@ function LiveSession() {
             <CardTitle>4 · Evidence relevance check</CardTitle>
           </CardHeader>
           <CardBody>
-            <ResultPanel result={result} assertions={[...active, ...inactive]} turns={turns} onFocusTurn={focusTurn} />
+            <ResultPanel
+              result={result}
+              assertions={[...active, ...inactive]}
+              turns={turns}
+              onFocusTurn={focusTurn}
+              processing={processingTurn}
+            />
           </CardBody>
         </Card>
       </div>

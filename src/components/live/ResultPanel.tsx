@@ -100,11 +100,13 @@ export default function ResultPanel({
   assertions,
   turns,
   onFocusTurn,
+  processing = false,
 }: {
   result: BackendResult | null;
   assertions: BackendAssertion[];
   turns: BackendTurn[];
   onFocusTurn: (turnId: string) => void;
+  processing?: boolean;
 }) {
   const [showHistory, setShowHistory] = useState(true);
   if (!result) {
@@ -115,6 +117,12 @@ export default function ResultPanel({
 
   return (
     <div className="space-y-3">
+      {processing && (
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-line bg-canvas px-3 py-1.5 text-xs text-ink-muted">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-teal" />
+          Analyzing finalized turn…
+        </div>
+      )}
       <div className={cn('rounded-lg border p-3', meta.border)}>
         <div className="flex items-center justify-between gap-2">
           <Badge tone={meta.tone}>{meta.label}</Badge>
@@ -148,6 +156,19 @@ export default function ResultPanel({
           <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Excluded context</div>
           <ul className="mt-1 list-disc pl-4 text-xs text-navy-soft">
             {result.excluded_notes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(result.conflict_notes ?? []).length > 0 && (
+        <div className="rounded-lg border border-navy/30 bg-canvas p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-navy">
+            Contradictions resolved by later statements
+          </div>
+          <ul className="mt-1 list-disc pl-4 text-xs text-navy-soft">
+            {result.conflict_notes.map((n) => (
               <li key={n}>{n}</li>
             ))}
           </ul>

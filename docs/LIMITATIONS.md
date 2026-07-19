@@ -20,8 +20,9 @@ Read this before drawing any conclusion from the app or benchmark.
   (and the live model's errors) are not represented in the 100% demo-mode metrics.
 - **Speaker labels are manual** (Doctor/Patient/Unknown selector); automatic diarization
   is not implemented, and subject attribution inherits any mislabeling.
-- **Planned hormonal products** are not treated as an eligible proposed pair (only
-  planned medications are, per spec §16.5) — a known blind spot.
+- **Mutually exclusive product knowledge is minimal.** Only the three oral-pill
+  concepts are declared mutually exclusive (clarification question when two are active);
+  other implausible product combinations are not detected.
 - **Audio benchmark layer is not executed** (no recordings, no transcription key in the
   build environment); its gold labels are frozen but unmeasured.
 - **Live mode is untested against the real provider API** — the relay and credential

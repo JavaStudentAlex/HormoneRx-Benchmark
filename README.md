@@ -12,7 +12,7 @@ Version 0.2.0 adds an audio-first, event-sourced **Python realtime engine**: it 
 - **Deterministic ontology** (`backend/data/synonym_index.json`) — approved synonyms, documented misspellings, and deliberately **ambiguous** aliases ("the pill", class words) that force abstention instead of guessing.
 - **Realtime encounter engine** (`backend/`) — FastAPI + Pydantic, append-only event log, derived graph snapshot, graph invariant validation, deterministic pair lookup, and a full warning lifecycle (create → update → **retract with reason**). Partial captions are display-only and can never trigger anything.
 - **Benchmarks** —
-  Layer A: 23 labelled text snippets; Layer B: 10 streaming sequences with an expected state after **every** event (corrections, negations, late/out-of-order events, duplicate replays, proposal lifecycle); Layer C: frozen audio manifest + gold labels (execution requires recordings and a transcription key — reported honestly as skipped until then).
+  Layer A: 24 labelled text snippets; Layer B: 13 streaming sequences with an expected state after **every** event (corrections, negations, late/out-of-order events, duplicate replays, proposal lifecycle); Layer C: frozen audio manifest + gold labels (execution requires recordings and a transcription key — reported honestly as skipped until then).
 - **Web app** — the existing React/Tailwind app plus a **Live Consultation** page: session controls with consent notice, speaker selector (D/P shortcuts), live transcript with provisional captions, encounter-graph panel with a superseded-assertion audit drawer, and an evidence panel with provenance chains and warning history. Old Analyze Case lives on as the offline **Text analysis** tab.
 
 ## Safety boundary (non-negotiable)
@@ -34,7 +34,7 @@ Open **http://localhost:5173/#/live** → *Start listening* → play a scripted 
 Other commands:
 
 ```bash
-npm run backend:test        # 91 backend tests (pytest)
+npm run backend:test        # 96 backend tests (pytest)
 npm run test                # 38 frontend tests (Vitest)
 npm run benchmark:backend   # Layers A+B+C -> backend/data/benchmark_results.json
 npm run benchmark           # legacy TS text benchmark (frontend demo pipeline)
@@ -58,7 +58,7 @@ npm run typecheck && npm run build
 
 ## Current results (deterministic demo pipeline — harness validation, not clinical accuracy)
 
-Layer A: 23/23 · Layer B: 10/10 sequences, per-event state accuracy 100%, retraction accuracy 100%, premature warnings 0, duplicate warnings 0, citation coverage 100%, unsupported claims 0 · backend processing latency median < 1 ms per turn (no network). Layer C: not executed. **Benchmark performance does not establish clinical safety. Absence of a record is not evidence of absence of an interaction.**
+Layer A: 24/24 · Layer B: 13/13 sequences, per-event state accuracy 100%, retraction accuracy 100%, premature warnings 0, duplicate warnings 0, citation coverage 100%, unsupported claims 0 · backend processing latency median < 1 ms per turn (no network). Layer C: not executed. **Benchmark performance does not establish clinical safety. Absence of a record is not evidence of absence of an interaction.**
 
 ## Stack
 

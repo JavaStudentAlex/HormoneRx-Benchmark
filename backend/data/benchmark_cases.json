@@ -8,7 +8,8 @@
     "explicit_negation": 3,
     "historical_use": 2,
     "ambiguous_missing": 5,
-    "excluded_discussion": 1
+    "excluded_discussion": 1,
+    "planned_proposed": 1
   },
   "cases": [
     {
@@ -288,6 +289,18 @@
       "expectedEvidenceRecordId": null,
       "expectedAbstention": true,
       "rationale": "A medication that is merely discussed is excluded context (spec §15.6, §17.4); it never becomes a patient assertion and no warning is produced."
+    },
+    {
+      "id": "CASE-024",
+      "category": "planned_proposed",
+      "input": "She takes carbamazepine and is considering starting the combined pill.",
+      "expectedHormonalProduct": "Combined hormonal contraceptive",
+      "expectedMedication": "Carbamazepine",
+      "expectedMedicationStatus": "current",
+      "expectedResultState": "EVIDENCE_FOUND",
+      "expectedEvidenceRecordId": "INT-001",
+      "expectedAbstention": false,
+      "rationale": "A hormonal product under consideration with a current enzyme inducer is an eligible proposed combination (spec §15.4 spirit); the warning is labeled proposed-context."
     }
   ]
 }

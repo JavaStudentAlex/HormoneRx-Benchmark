@@ -169,6 +169,13 @@ class EncounterService:
                 sequence=seq,
             )
 
+            # Realtime feedback: the UI shows the turn as in-analysis until the
+            # recompute publishes the next result (matters for live-model latency).
+            await self._broadcast(
+                runtime,
+                {"type": "result.processing", "turn_id": turn.turn_id, "speaker": speaker.value},
+            )
+
             # Structured extraction with validated output; deterministic fallback on failure.
             try:
                 extraction = await self.extractor.extract(turn)
@@ -307,6 +314,7 @@ class EncounterService:
             lookup_reason=outcome.lookup_reason,
             missing_information=outcome.missing_information,
             excluded_notes=outcome.excluded_notes,
+            conflict_notes=outcome.conflict_notes,
             messages=outcome.messages,
             latencies=runtime.latencies,
         )
@@ -370,6 +378,7 @@ class EncounterService:
             "lookup_reason": snapshot.lookup_reason,
             "missing_information": snapshot.missing_information,
             "excluded_notes": snapshot.excluded_notes,
+            "conflict_notes": snapshot.conflict_notes,
             "messages": snapshot.messages,
             "active_warnings": [self.warning_payload(w) for w in snapshot.active_warnings()],
             "warning_history": [

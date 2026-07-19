@@ -53,6 +53,7 @@ export interface BackendResult {
   lookup_reason: string;
   missing_information: string[];
   excluded_notes: string[];
+  conflict_notes: string[];
   messages: string[];
   active_warnings: BackendWarning[];
   warning_history: BackendWarning[];
@@ -116,6 +117,7 @@ export type ServerEvent =
   | { type: 'graph.updated'; active_assertions: BackendAssertion[]; inactive_assertions: BackendAssertion[]; proposals: BackendProposal[] }
   | { type: 'result.updated'; result: BackendResult }
   | { type: 'warning.created' | 'warning.updated' | 'warning.retracted'; warning: BackendWarning }
+  | { type: 'result.processing'; turn_id: string; speaker: string }
   | { type: 'processing.error'; detail: string }
   | { type: 'event.duplicate'; event_id: string };
 

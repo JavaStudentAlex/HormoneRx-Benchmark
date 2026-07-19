@@ -56,6 +56,7 @@ class Ontology:
     ambiguous_hormonal_aliases: dict[str, dict]
     ambiguous_medication_aliases: dict[str, dict]
     non_interacting_medications: list[str]
+    mutually_exclusive_groups: dict[str, list[str]] = field(default_factory=dict)
 
     def canonical_name(self, concept_id: str) -> str:
         if concept_id in self.hormonal_concepts:
@@ -91,6 +92,7 @@ class EvidenceIndex:
             ambiguous_hormonal_aliases=onto_raw.get("ambiguousHormonalAliases", {}),
             ambiguous_medication_aliases=onto_raw.get("ambiguousMedicationAliases", {}),
             non_interacting_medications=onto_raw.get("nonInteractingMedications", []),
+            mutually_exclusive_groups=onto_raw.get("mutuallyExclusiveGroups", {}),
         )
 
         self.reports: dict[str, EligibilityReport] = {}

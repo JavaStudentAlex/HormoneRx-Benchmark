@@ -5,7 +5,7 @@
     "engine": "hormonerx-backend/0.2.0",
     "extractionModel": "deterministic-rule-extractor/0.2.0",
     "mode": "demo-deterministic",
-    "evalTimestamp": "2026-07-19T01:45:05.304169+00:00",
+    "evalTimestamp": "2026-07-19T02:06:18.875616+00:00",
     "deterministic": true,
     "runtimeEligibleRecords": [
       "INT-001",
@@ -27,7 +27,7 @@
   "layers": {
     "text": {
       "layer": "A-text",
-      "caseCount": 23,
+      "caseCount": 24,
       "metrics": {
         "passRate": 1.0,
         "triggerPrecision": 1.0,
@@ -43,14 +43,14 @@
         "unsupportedClaimCount": 0
       },
       "confusion": {
-        "truePositive": 10,
+        "truePositive": 11,
         "falsePositive": 0,
         "falseNegative": 0,
         "trueNegative": 13
       },
       "counts": {
-        "passCount": 23,
-        "total": 23
+        "passCount": 24,
+        "total": 24
       },
       "cases": [
         {
@@ -305,12 +305,23 @@
           "actualEvidenceRecordId": null,
           "pass": true,
           "lookupReason": "A relevant-sounding mention is excluded from matching by its context."
+        },
+        {
+          "id": "CASE-024",
+          "category": "planned_proposed",
+          "input": "She takes carbamazepine and is considering starting the combined pill.",
+          "expectedResultState": "EVIDENCE_FOUND",
+          "actualResultState": "EVIDENCE_FOUND",
+          "expectedEvidenceRecordId": "INT-001",
+          "actualEvidenceRecordId": "INT-001",
+          "pass": true,
+          "lookupReason": "A verified-record lookup matched the current encounter graph (record INT-001)."
         }
       ]
     },
     "streaming": {
       "layer": "B-streaming",
-      "caseCount": 10,
+      "caseCount": 13,
       "metrics": {
         "casePassRate": 1.0,
         "perEventStateAccuracy": 1.0,
@@ -324,14 +335,14 @@
         "unsupportedClaimCount": 0
       },
       "counts": {
-        "events": 26,
-        "eventsCorrect": 26
+        "events": 33,
+        "eventsCorrect": 33
       },
       "processingLatency": {
-        "samples": 45,
-        "medianMs": 0.34,
-        "p90Ms": 0.43,
-        "maxMs": 0.88,
+        "samples": 53,
+        "medianMs": 0.36,
+        "p90Ms": 0.5,
+        "maxMs": 1.02,
         "note": "Backend pipeline only (final transcript received -> result computed), deterministic extractor, no network. Live-mode model latency is not included and must be measured separately."
       },
       "cases": [
@@ -728,6 +739,125 @@
             },
             {
               "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-011",
+          "category": "flip_flop_reaffirmation",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "RETRACTED",
+                "EXCLUDED_CONTEXT"
+              ],
+              "actualResultState": "RETRACTED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 3,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-012",
+          "category": "hormonal_correction_switch",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-003"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-003"
+              ],
+              "pass": true
+            },
+            {
+              "sequence": 2,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "EVIDENCE_FOUND"
+              ],
+              "actualResultState": "EVIDENCE_FOUND",
+              "expectedEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "actualEvidenceRecordIds": [
+                "INT-001"
+              ],
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "STREAM-013",
+          "category": "planned_hormonal_danger_moment",
+          "pass": true,
+          "events": [
+            {
+              "sequence": 1,
+              "type": "transcript.final",
+              "expectedResultStates": [
+                "MORE_INFORMATION_REQUIRED"
+              ],
+              "actualResultState": "MORE_INFORMATION_REQUIRED",
+              "expectedEvidenceRecordIds": [],
+              "actualEvidenceRecordIds": [],
+              "pass": true
+            },
+            {
+              "sequence": 2,
               "type": "transcript.final",
               "expectedResultStates": [
                 "EVIDENCE_FOUND"

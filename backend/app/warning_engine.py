@@ -41,6 +41,7 @@ class ReconcileOutcome:
         self.lookup_reason: str = ""
         self.missing_information: list[str] = []
         self.excluded_notes: list[str] = []
+        self.conflict_notes: list[str] = []
         self.messages: list[str] = []
 
 
@@ -175,7 +176,8 @@ class WarningEngine:
         ]
         hormonal_current = [
             a for a in patient_active
-            if a.category == MentionCategory.HORMONAL_PRODUCT and a.predicate == Predicate.CURRENTLY_USES
+            if a.category == MentionCategory.HORMONAL_PRODUCT
+            and a.predicate in (Predicate.CURRENTLY_USES, Predicate.PLANS_TO_TAKE)
         ]
         medication_current_or_planned = [
             a for a in patient_active
@@ -185,6 +187,20 @@ class WarningEngine:
 
         missing: list[str] = []
         excluded: list[str] = []
+        outcome.conflict_notes = list(state.conflict_notes)
+
+        # Mutually exclusive product groups (e.g. the three oral-pill concepts):
+        # if two are simultaneously active for the patient, warnings still stand on
+        # both (cautious), but the conflict is surfaced as a clarification question.
+        for group_name, members in self.index.ontology.mutually_exclusive_groups.items():
+            active_members = sorted(
+                {a.canonical_name for a in hormonal_current if a.concept_id in members}
+            )
+            if len(active_members) > 1:
+                missing.append(
+                    f"Multiple {group_name.replace('_', ' ')} products are recorded for the patient "
+                    f"({' and '.join(active_members)}) — confirm which one is in use."
+                )
 
         # Ambiguous / unknown / uncertain mentions drive clarification requests.
         for nm in state.mentions:

@@ -297,10 +297,17 @@ class DeterministicExtractor:
     def _detect_corrections(lower: str, mentions: list[ExtractedMention]) -> list[Correction]:
         if not _contains_any(lower, CORRECTION_CUES):
             return []
+        # The replacement is the current-status mention in the correcting turn —
+        # a medication ("I meant lamotrigine") or a hormonal product
+        # ("I meant the combined pill"). The reducer supersedes the latest prior
+        # assertion of the same category.
         replacement = None
-        for m in mentions:
-            if m.category == MentionCategory.OTHER_MEDICATION and m.status == MentionStatus.CURRENT:
-                replacement = m.surface_text
+        for category in (MentionCategory.OTHER_MEDICATION, MentionCategory.HORMONAL_PRODUCT):
+            for m in mentions:
+                if m.category == category and m.status == MentionStatus.CURRENT:
+                    replacement = m.surface_text
+                    break
+            if replacement:
                 break
         return [
             Correction(

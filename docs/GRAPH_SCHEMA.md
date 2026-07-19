@@ -55,8 +55,15 @@ PLANS_TO_TAKE medication concept)` — both normalized to approved IDs. Negated,
 historical, uncertain, other-person, doctor, and unknown-subject assertions never enter
 the pair set. PLANS_TO_TAKE pairs are labeled **proposed combination**.
 
-Known limitation: a *planned hormonal product* with a current medication is not treated
-as an eligible pair (spec literal); see `docs/LIMITATIONS.md`.
+**Danger-moment extension (v0.2.1):** a *planned* hormonal product with a current
+medication IS an eligible **proposed-combination** pair (beyond the spec §16.5 literal,
+following §15.4's "planned may be checked") — so the warning appears while the
+prescription is being *considered*. Resolved contradictions (polarity flips like
+current→negated or a corrected pill product) are surfaced as **conflict notes** in the
+result payload rather than silently applied; unresolved same-turn contradictions still
+abstain. Mutually exclusive product groups (the three oral-pill concepts, declared in
+`synonym_index.json`) trigger a clarification question when two are simultaneously
+active, while warnings on both remain standing (cautious).
 
 ## Invariants (validated on every recompute, spec §16.4)
 

@@ -1,16 +1,48 @@
 {
   "benchmarkVersion": "0.2.0",
   "layer": "B-streaming",
-  "note": "Streaming state benchmark (spec §25.2): each case is a sequence of finalized events with immutable expected state after every event. Gold labels reflect the task-spec state machine and must not be altered to improve metrics. Where the spec itself allows two states (e.g. RETRACTED or EXCLUDED_CONTEXT after a correction), expectedResultStates lists the allowed set.",
+  "note": "Streaming state benchmark (spec §25.2): each case is a sequence of finalized events with immutable expected state after every event. Gold labels reflect the task-spec state machine and must not be altered to improve metrics. Where the spec itself allows two states (e.g. RETRACTED or EXCLUDED_CONTEXT after a correction), expectedResultStates lists the allowed set. v0.2.1 added STREAM-011..013 (flip-flop re-affirmation, hormonal-product correction, planned-hormonal proposed pair) as new coverage for danger-moment and contradiction behaviors; no existing gold label was changed.",
   "cases": [
     {
       "id": "STREAM-001",
       "category": "context_completed_over_turns",
       "description": "Demo 1: medication first, hormonal product later; the warning appears only when the pair completes.",
       "events": [
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "I take carbamazepine.", "expectedResultStates": ["MORE_INFORMATION_REQUIRED"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0 },
-        { "type": "transcript.final", "sequence": 2, "speaker": "doctor", "text": "Are you using hormonal contraception?", "expectedResultStates": ["MORE_INFORMATION_REQUIRED"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0 },
-        { "type": "transcript.final", "sequence": 3, "speaker": "patient", "text": "I use the combined pill.", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-001"], "expectedActiveWarningCount": 1 }
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I take carbamazepine.",
+          "expectedResultStates": [
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 2,
+          "speaker": "doctor",
+          "text": "Are you using hormonal contraception?",
+          "expectedResultStates": [
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 3,
+          "speaker": "patient",
+          "text": "I use the combined pill.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        }
       ]
     },
     {
@@ -18,8 +50,32 @@
       "category": "positive_later_negated",
       "description": "An established warning is retracted when the patient negates the medication.",
       "events": [
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "I use the combined pill and take carbamazepine.", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-001"], "expectedActiveWarningCount": 1 },
-        { "type": "transcript.final", "sequence": 2, "speaker": "patient", "text": "Wait, no — I am not taking carbamazepine anymore.", "expectedResultStates": ["RETRACTED", "EXCLUDED_CONTEXT"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0, "expectRetractionWithReason": true }
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I use the combined pill and take carbamazepine.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 2,
+          "speaker": "patient",
+          "text": "Wait, no — I am not taking carbamazepine anymore.",
+          "expectedResultStates": [
+            "RETRACTED",
+            "EXCLUDED_CONTEXT"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0,
+          "expectRetractionWithReason": true
+        }
       ]
     },
     {
@@ -27,9 +83,43 @@
       "category": "positive_later_historicized",
       "description": "Demo 2: current use becomes historical; the warning is retracted with an explanation.",
       "events": [
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "Yes, I take Tegretol.", "expectedResultStates": ["MORE_INFORMATION_REQUIRED"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0 },
-        { "type": "transcript.final", "sequence": 2, "speaker": "patient", "text": "Yes, I use the combined pill.", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-001"], "expectedActiveWarningCount": 1 },
-        { "type": "transcript.final", "sequence": 3, "speaker": "patient", "text": "Sorry, I stopped Tegretol last year.", "expectedResultStates": ["RETRACTED", "EXCLUDED_CONTEXT"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0, "expectRetractionWithReason": true }
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "Yes, I take Tegretol.",
+          "expectedResultStates": [
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 2,
+          "speaker": "patient",
+          "text": "Yes, I use the combined pill.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 3,
+          "speaker": "patient",
+          "text": "Sorry, I stopped Tegretol last year.",
+          "expectedResultStates": [
+            "RETRACTED",
+            "EXCLUDED_CONTEXT"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0,
+          "expectRetractionWithReason": true
+        }
       ]
     },
     {
@@ -37,8 +127,33 @@
       "category": "wrong_medication_corrected",
       "description": "Correction to a different interacting drug: the stale warning is retracted and the correct record (reversed direction) is matched in the same recompute.",
       "events": [
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "I use an estrogen-containing pill and take carbamazepine.", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-001"], "expectedActiveWarningCount": 1 },
-        { "type": "transcript.final", "sequence": 2, "speaker": "patient", "text": "Sorry, I meant lamotrigine.", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-005"], "expectedActiveWarningCount": 1, "expectRetractionWithReason": true }
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I use an estrogen-containing pill and take carbamazepine.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 2,
+          "speaker": "patient",
+          "text": "Sorry, I meant lamotrigine.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-005"
+          ],
+          "expectedActiveWarningCount": 1,
+          "expectRetractionWithReason": true
+        }
       ]
     },
     {
@@ -46,9 +161,41 @@
       "category": "other_person_then_clarified",
       "description": "A relative's medication is excluded until the patient states their own use.",
       "events": [
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "I use the combined pill.", "expectedResultStates": ["MORE_INFORMATION_REQUIRED"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0 },
-        { "type": "transcript.final", "sequence": 2, "speaker": "patient", "text": "My sister takes carbamazepine.", "expectedResultStates": ["EXCLUDED_CONTEXT"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0 },
-        { "type": "transcript.final", "sequence": 3, "speaker": "patient", "text": "Actually I take carbamazepine as well.", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-001"], "expectedActiveWarningCount": 1 }
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I use the combined pill.",
+          "expectedResultStates": [
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 2,
+          "speaker": "patient",
+          "text": "My sister takes carbamazepine.",
+          "expectedResultStates": [
+            "EXCLUDED_CONTEXT"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 3,
+          "speaker": "patient",
+          "text": "Actually I take carbamazepine as well.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        }
       ]
     },
     {
@@ -56,8 +203,31 @@
       "category": "proposed_prescription_added",
       "description": "Checkpoint 4: a UI-proposed prescription completes a proposed-context pair.",
       "events": [
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "I use the combined pill.", "expectedResultStates": ["MORE_INFORMATION_REQUIRED"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0 },
-        { "type": "prescription.proposed", "sequence": 2, "speaker": "doctor", "medication_surface_text": "Lamotrigine", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-005"], "expectedActiveWarningCount": 1, "expectedWarningContext": "proposed_combination" }
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I use the combined pill.",
+          "expectedResultStates": [
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "prescription.proposed",
+          "sequence": 2,
+          "speaker": "doctor",
+          "medication_surface_text": "Lamotrigine",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-005"
+          ],
+          "expectedActiveWarningCount": 1,
+          "expectedWarningContext": "proposed_combination"
+        }
       ]
     },
     {
@@ -65,9 +235,44 @@
       "category": "proposed_prescription_cancelled",
       "description": "Cancelling the proposal retracts the proposed-context warning with a reason.",
       "events": [
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "I use the combined pill.", "expectedResultStates": ["MORE_INFORMATION_REQUIRED"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0 },
-        { "type": "prescription.proposed", "sequence": 2, "speaker": "doctor", "medication_surface_text": "Carbamazepine", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-001"], "expectedActiveWarningCount": 1, "expectedWarningContext": "proposed_combination" },
-        { "type": "prescription.cancelled", "sequence": 3, "speaker": "doctor", "cancelsEventOfSequence": 2, "expectedResultStates": ["RETRACTED", "MORE_INFORMATION_REQUIRED"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0, "expectRetractionWithReason": true }
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I use the combined pill.",
+          "expectedResultStates": [
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "prescription.proposed",
+          "sequence": 2,
+          "speaker": "doctor",
+          "medication_surface_text": "Carbamazepine",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1,
+          "expectedWarningContext": "proposed_combination"
+        },
+        {
+          "type": "prescription.cancelled",
+          "sequence": 3,
+          "speaker": "doctor",
+          "cancelsEventOfSequence": 2,
+          "expectedResultStates": [
+            "RETRACTED",
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0,
+          "expectRetractionWithReason": true
+        }
       ]
     },
     {
@@ -75,9 +280,41 @@
       "category": "ambiguity_resolved_later",
       "description": "Bare 'the pill' abstains until the method is specified.",
       "events": [
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "I take carbamazepine and use the pill.", "expectedResultStates": ["MORE_INFORMATION_REQUIRED"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0 },
-        { "type": "transcript.final", "sequence": 2, "speaker": "doctor", "text": "Which pill do you use?", "expectedResultStates": ["MORE_INFORMATION_REQUIRED"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0 },
-        { "type": "transcript.final", "sequence": 3, "speaker": "patient", "text": "It is the combined pill.", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-001"], "expectedActiveWarningCount": 1 }
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I take carbamazepine and use the pill.",
+          "expectedResultStates": [
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 2,
+          "speaker": "doctor",
+          "text": "Which pill do you use?",
+          "expectedResultStates": [
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 3,
+          "speaker": "patient",
+          "text": "It is the combined pill.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        }
       ]
     },
     {
@@ -85,9 +322,44 @@
       "category": "late_out_of_order_event",
       "description": "A late-arriving earlier turn (historicizing the medication) forces recomputation: the warning created from the out-of-order view is retracted.",
       "events": [
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "I take carbamazepine.", "expectedResultStates": ["MORE_INFORMATION_REQUIRED"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0 },
-        { "type": "transcript.final", "sequence": 3, "speaker": "patient", "text": "I use the combined pill.", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-001"], "expectedActiveWarningCount": 1 },
-        { "type": "transcript.final", "sequence": 2, "speaker": "patient", "text": "Although — I actually stopped carbamazepine months ago.", "expectedResultStates": ["RETRACTED", "EXCLUDED_CONTEXT"], "expectedEvidenceRecordIds": [], "expectedActiveWarningCount": 0, "expectRetractionWithReason": true, "arrivesLate": true }
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I take carbamazepine.",
+          "expectedResultStates": [
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 3,
+          "speaker": "patient",
+          "text": "I use the combined pill.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 2,
+          "speaker": "patient",
+          "text": "Although — I actually stopped carbamazepine months ago.",
+          "expectedResultStates": [
+            "RETRACTED",
+            "EXCLUDED_CONTEXT"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0,
+          "expectRetractionWithReason": true,
+          "arrivesLate": true
+        }
       ]
     },
     {
@@ -95,8 +367,147 @@
       "category": "duplicate_event_replay",
       "description": "Replaying the same finalized event must not duplicate assertions or warnings.",
       "events": [
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "I use the combined pill and take carbamazepine.", "event_id": "stream10-evt-1", "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-001"], "expectedActiveWarningCount": 1 },
-        { "type": "transcript.final", "sequence": 1, "speaker": "patient", "text": "I use the combined pill and take carbamazepine.", "event_id": "stream10-evt-1", "isDuplicateReplay": true, "expectedResultStates": ["EVIDENCE_FOUND"], "expectedEvidenceRecordIds": ["INT-001"], "expectedActiveWarningCount": 1 }
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I use the combined pill and take carbamazepine.",
+          "event_id": "stream10-evt-1",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I use the combined pill and take carbamazepine.",
+          "event_id": "stream10-evt-1",
+          "isDuplicateReplay": true,
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        }
+      ]
+    },
+    {
+      "id": "STREAM-011",
+      "category": "flip_flop_reaffirmation",
+      "description": "Negation retracts the warning; re-affirmation must immediately re-warn (danger moment must not stay suppressed).",
+      "events": [
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I use the combined pill and take carbamazepine.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 2,
+          "speaker": "patient",
+          "text": "Wait, no — I am not taking carbamazepine.",
+          "expectedResultStates": [
+            "RETRACTED",
+            "EXCLUDED_CONTEXT"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0,
+          "expectRetractionWithReason": true
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 3,
+          "speaker": "patient",
+          "text": "No wait, I do take carbamazepine every day.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1
+        }
+      ]
+    },
+    {
+      "id": "STREAM-012",
+      "category": "hormonal_correction_switch",
+      "description": "Correcting the pill product moves the warning between records (INT-003 -> INT-001) in a single recompute, with the stale warning visibly retracted.",
+      "events": [
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I take the mini pill and carbamazepine.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-003"
+          ],
+          "expectedActiveWarningCount": 1
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 2,
+          "speaker": "patient",
+          "text": "Sorry, I meant the combined pill.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1,
+          "expectRetractionWithReason": true
+        }
+      ]
+    },
+    {
+      "id": "STREAM-013",
+      "category": "planned_hormonal_danger_moment",
+      "description": "Contraception is being considered while an enzyme inducer is current: the proposed-context warning must appear at consideration time.",
+      "events": [
+        {
+          "type": "transcript.final",
+          "sequence": 1,
+          "speaker": "patient",
+          "text": "I take carbamazepine for my epilepsy.",
+          "expectedResultStates": [
+            "MORE_INFORMATION_REQUIRED"
+          ],
+          "expectedEvidenceRecordIds": [],
+          "expectedActiveWarningCount": 0
+        },
+        {
+          "type": "transcript.final",
+          "sequence": 2,
+          "speaker": "patient",
+          "text": "I am considering starting the combined pill.",
+          "expectedResultStates": [
+            "EVIDENCE_FOUND"
+          ],
+          "expectedEvidenceRecordIds": [
+            "INT-001"
+          ],
+          "expectedActiveWarningCount": 1,
+          "expectedWarningContext": "proposed_combination"
+        }
       ]
     }
   ]
