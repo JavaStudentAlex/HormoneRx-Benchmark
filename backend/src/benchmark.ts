@@ -21,7 +21,7 @@ import { DeterministicExtractor, EXTRACTOR_VERSION } from './deterministicExtrac
 import { DuplicateEventError, EncounterService } from './encounterService.ts';
 import { EvidenceIndex, pairKey } from './evidenceIndex.ts';
 import { type DistressFlag, Speaker, activeWarnings, newId } from './models.ts';
-import { SoundAgent } from './soundAgent.ts';
+import { SoundAgent, textDistress } from './soundAgent.ts';
 import {
   ElevenLabsAffectModel,
   OpenAiAudioAffectModel,
@@ -870,6 +870,76 @@ export async function runSoundAgentLayer(): Promise<Record<string, unknown>> {
 }
 
 // ---------------------------------------------------------------------------
+// Affect-probe layer — does the advisory affect layer actually SEPARATE distress?
+// ---------------------------------------------------------------------------
+
+interface ProbeUtterance {
+  id: string;
+  expected: 'none' | 'low' | 'elevated';
+  text: string;
+}
+
+export async function runAffectProbeLayer(): Promise<Record<string, unknown>> {
+  const probe = JSON.parse(readFileSync(path.join(BACKEND_DIR, 'data', 'affect_probe.json'), 'utf8')) as {
+    utterances: ProbeUtterance[];
+    negativeEmotions: string[];
+  };
+  const neg = new Set(probe.negativeEmotions.map((s) => s.toLowerCase()));
+  const settings = getSettings();
+  const openaiKey = settings.openai_api_key;
+  const textModel = openaiKey ? new OpenAiTextAffectModel({ apiKey: openaiKey, baseUrl: settings.openai_base_url }) : null;
+
+  const n = probe.utterances.length;
+  let l1BucketCorrect = 0;
+  let l1DetectCorrect = 0;
+  let cloudRan = 0;
+  let cloudSepCorrect = 0;
+  const cloudErrors: string[] = [];
+  const rows: Array<Record<string, unknown>> = [];
+
+  for (const u of probe.utterances) {
+    const expectedDistress = u.expected !== 'none';
+    const l1 = textDistress(u.text).level;
+    if (l1 === u.expected) l1BucketCorrect++;
+    if ((l1 !== 'none') === expectedDistress) l1DetectCorrect++;
+
+    let cloudLabel: string | null = null;
+    let cloudDistress: boolean | null = null;
+    if (textModel) {
+      try {
+        const out = await textModel.infer({ transcript: u.text });
+        cloudLabel = out.categorical_emotion?.label ?? null;
+        if (cloudLabel !== null) {
+          cloudRan++;
+          cloudDistress = neg.has(cloudLabel.toLowerCase());
+          if (cloudDistress === expectedDistress) cloudSepCorrect++;
+        }
+      } catch (e) {
+        cloudErrors.push(`${u.id}: ${String(e).slice(0, 120)}`);
+      }
+    }
+    rows.push({ id: u.id, expected: u.expected, layer1Level: l1, cloudEmotion: cloudLabel, cloudDistress });
+  }
+
+  return {
+    layer: 'F-affectprobe',
+    caseCount: n,
+    metrics: {
+      layer1BucketAccuracy: round4(safeDiv(l1BucketCorrect, n)),
+      layer1DistressDetectAccuracy: round4(safeDiv(l1DetectCorrect, n)),
+      cloudModel: textModel ? textModel.name : null,
+      cloudScored: cloudRan,
+      cloudDistressSeparationAccuracy: cloudRan ? round4(safeDiv(cloudSepCorrect, cloudRan)) : null,
+      cloudErrorCount: cloudErrors.length,
+    },
+    note:
+      'Signal test (no drug entities -> cannot warn). Layer-1 = deterministic lexical distress; cloud = OpenAI gpt-4o-mini text affect. Both advisory. Measures whether distress utterances separate from neutral, per gold label.',
+    rows,
+    cloudErrorsSample: cloudErrors.slice(0, 6),
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 export async function main(layers: string[]): Promise<void> {
   const service = buildService();
@@ -903,6 +973,9 @@ export async function main(layers: string[]): Promise<void> {
   }
   if (layers.includes('soundagent')) {
     output.layers.soundagent = await runSoundAgentLayer();
+  }
+  if (layers.includes('affectprobe')) {
+    output.layers.affectprobe = await runAffectProbeLayer();
   }
 
   const resultsPath = path.join(BACKEND_DIR, 'data', 'benchmark_results.json');
@@ -941,7 +1014,7 @@ if (isMain) {
   }
   let selected = layerArgs.length ? layerArgs : ['all'];
   if (selected.includes('all')) {
-    selected = ['text', 'streaming', 'audio', 'index', 'soundagent'];
+    selected = ['text', 'streaming', 'audio', 'index', 'soundagent', 'affectprobe'];
   }
   main(selected).catch((err) => {
     console.error(err);

@@ -1,0 +1,16 @@
+{
+  "version": "0.1.0",
+  "note": "Frozen affect-signal probe. Labeled utterances (neutral / low / elevated distress) with NO drug or hormonal entities, so nothing here can ever trigger a warning — this measures ONLY whether the advisory affect layer separates distress from neutral. Synthetic sentences; not from any patient. Gold labels are frozen and never edited to improve metrics.",
+  "negativeEmotions": ["fear", "fearful", "afraid", "scared", "anxiety", "anxious", "nervous", "sad", "sadness", "unhappy", "anger", "angry", "distress", "distressed", "worried", "upset", "hopeless", "helpless", "frustrated", "frustration", "panic", "overwhelmed"],
+  "utterances": [
+    { "id": "AP-N1", "expected": "none", "text": "Yes, I take it every morning with breakfast." },
+    { "id": "AP-N2", "expected": "none", "text": "The appointment is next Tuesday at ten o'clock." },
+    { "id": "AP-N3", "expected": "none", "text": "I feel fine and everything seems normal." },
+    { "id": "AP-L1", "expected": "low", "text": "I'm a little worried about the side effects." },
+    { "id": "AP-L2", "expected": "low", "text": "I'm a bit nervous about starting something new." },
+    { "id": "AP-E1", "expected": "elevated", "text": "I'm really scared and in so much pain, and no one listens to me." },
+    { "id": "AP-E2", "expected": "elevated", "text": "I can't cope anymore, I feel completely hopeless." },
+    { "id": "AP-E3", "expected": "elevated", "text": "I'm terrified, exhausted, and something is wrong." },
+    { "id": "AP-E4", "expected": "elevated", "text": "I keep saying something is wrong but no one listens to me." }
+  ]
+}
