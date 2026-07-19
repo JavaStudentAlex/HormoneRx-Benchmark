@@ -31,6 +31,19 @@ export interface Settings {
   evidence_allow_pending_verification: boolean;
   extraction_fallback_deterministic: boolean;
   log_level: string;
+  // -- agent fleet (v0.4.0) -------------------------------------------------
+  fleet_enabled: boolean;
+  // Washout-window sentinel is a PROPOSED behavior change (records INT-001/003/
+  // 004/006 state risk persists 28 days / 4 weeks after stopping an enzyme
+  // inducer, but the engine retracts on "stopped"). It stays off until the
+  // physician approves it, and is forced off in production like the
+  // pending-verification override. Even when on it is advisory-only.
+  fleet_washout_sentinel: boolean;
+  // Outbound network checks of evidence source URLs; off by default so dev and
+  // CI runs make no surprise egress.
+  fleet_link_check: boolean;
+  fleet_link_interval_min: number;
+  fleet_watchdog_interval_s: number;
 }
 
 export function defaultSettings(overrides: Partial<Settings> = {}): Settings {
@@ -50,6 +63,11 @@ export function defaultSettings(overrides: Partial<Settings> = {}): Settings {
     evidence_allow_pending_verification: true,
     extraction_fallback_deterministic: true,
     log_level: 'INFO',
+    fleet_enabled: true,
+    fleet_washout_sentinel: false,
+    fleet_link_check: false,
+    fleet_link_interval_min: 360,
+    fleet_watchdog_interval_s: 60,
     ...overrides,
   };
 }
@@ -83,6 +101,11 @@ export function getSettings(): Settings {
       : envBool('EVIDENCE_ALLOW_PENDING_VERIFICATION', true),
     extraction_fallback_deterministic: envBool('EXTRACTION_FALLBACK_DETERMINISTIC', true),
     log_level: env.LOG_LEVEL ?? 'INFO',
+    fleet_enabled: envBool('FLEET_ENABLED', true),
+    fleet_washout_sentinel: isProduction ? false : envBool('FLEET_WASHOUT_SENTINEL', false),
+    fleet_link_check: envBool('FLEET_LINK_CHECK', false),
+    fleet_link_interval_min: Number(env.FLEET_LINK_INTERVAL_MIN ?? 360),
+    fleet_watchdog_interval_s: Number(env.FLEET_WATCHDOG_INTERVAL_S ?? 60),
   });
   return cached;
 }

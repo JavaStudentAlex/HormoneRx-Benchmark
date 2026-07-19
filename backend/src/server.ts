@@ -18,8 +18,10 @@ import { EXTRACTOR_VERSION } from './deterministicExtractor.ts';
 import { DuplicateEventError, EncounterRuntime, EncounterService } from './encounterService.ts';
 import { EvidenceIndex, EvidenceValidationError } from './evidenceIndex.ts';
 import { LiveExtractor, buildExtractor } from './extractor.ts';
+import { buildFleet } from './fleet/registry.ts';
+import { FleetSupervisor } from './fleet/supervisor.ts';
 import { EventType, SPEAKER_VALUES, Speaker, newId } from './models.ts';
-import { ProviderRelay, RealtimeSessionError, mintClientSecret } from './realtimeSession.ts';
+import { RealtimeSessionError, RelaySupervisor, mintClientSecret } from './realtimeSession.ts';
 
 interface DemoScript {
   id: string;
@@ -33,6 +35,7 @@ export interface Backend {
   service: EncounterService;
   settings: Settings;
   index: EvidenceIndex;
+  fleet: FleetSupervisor | null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -62,6 +65,15 @@ export function createBackend(settings: Settings = getSettings()): Backend {
 
   const extractor = buildExtractor(settings, index);
   const service = new EncounterService(settings, index, extractor);
+
+  // Agent fleet: always-running workers over the event log (docs/FLEET.md).
+  let fleet: FleetSupervisor | null = null;
+  if (settings.fleet_enabled) {
+    fleet = buildFleet(settings, index);
+    fleet.attach(service);
+    fleet.start();
+  }
+
   const demoScripts = JSON.parse(
     readFileSync(path.join(BACKEND_DIR, 'data', 'demo_scripts.json'), 'utf8'),
   ) as { scripts: DemoScript[] };
@@ -129,6 +141,46 @@ export function createBackend(settings: Settings = getSettings()): Backend {
 
   app.get('/api/demo-scripts', (_req, res) => {
     res.json(demoScripts);
+  });
+
+  // -- agent fleet (docs/FLEET.md) -----------------------------------------
+
+  app.get('/api/fleet/status', (_req, res) => {
+    if (!fleet) {
+      res.status(503).json({ detail: 'fleet disabled (FLEET_ENABLED=false)' });
+      return;
+    }
+    res.json(fleet.statusPayload());
+  });
+
+  app.get('/api/fleet/findings', (req, res) => {
+    if (!fleet) {
+      res.status(503).json({ detail: 'fleet disabled (FLEET_ENABLED=false)' });
+      return;
+    }
+    const encounterId = req.query.encounter_id ? String(req.query.encounter_id) : undefined;
+    const limit = Math.min(Number(req.query.limit ?? 50) || 50, 200);
+    res.json({ findings: fleet.recentFindings(encounterId, limit) });
+  });
+
+  app.get('/api/fleet/review-queue', (_req, res) => {
+    if (!fleet) {
+      res.status(503).json({ detail: 'fleet disabled (FLEET_ENABLED=false)' });
+      return;
+    }
+    res.json({ items: fleet.reviewQueueItems() });
+  });
+
+  /** Run all interval workers immediately (watchdog self-check, link monitor). */
+  app.post('/api/fleet/run', (_req, res) => {
+    if (!fleet) {
+      res.status(503).json({ detail: 'fleet disabled (FLEET_ENABLED=false)' });
+      return;
+    }
+    fleet
+      .runIntervalWorkersOnce()
+      .then(() => res.json(fleet!.statusPayload()))
+      .catch((err) => handleError(res, err));
   });
 
   // -- realtime credentials (spec §21.1) -----------------------------------
@@ -279,7 +331,7 @@ export function createBackend(settings: Settings = getSettings()): Backend {
     }
   });
 
-  return { app, server, service, settings, index };
+  return { app, server, service, settings, index, fleet };
 }
 
 // ---------------------------------------------------------------------------
@@ -462,28 +514,52 @@ async function handleAudioSocket(
     }
   };
 
-  const relay = new ProviderRelay(settings, onPartial, onFinal);
-  try {
-    await relay.connect();
-  } catch (err) {
-    if (err instanceof RealtimeSessionError) {
-      runtime.store.append(EventType.TRANSCRIPTION_FAILED, { error: err.message });
-      ws.send(
-        JSON.stringify({
-          type: 'processing.error',
-          detail: `Live transcription unavailable: ${err.message}`,
-        }),
-      );
-      ws.close(4503);
-      return;
-    }
-    throw err;
+  // Missing key fails fast (previous behavior); the supervisor's retry budget
+  // is reserved for network-level failures during a running session.
+  if (!settings.openai_api_key) {
+    const detail = 'OPENAI_API_KEY is not configured on the server';
+    runtime.store.append(EventType.TRANSCRIPTION_FAILED, { error: detail });
+    ws.send(JSON.stringify({ type: 'processing.error', detail: `Live transcription unavailable: ${detail}` }));
+    ws.close(4503);
+    return;
   }
 
-  void relay.pump();
+  // Supervised relay: reconnects with backoff when the provider closes the
+  // socket mid-session, so long consultations survive provider session caps.
+  const relaySupervisor = new RelaySupervisor(settings, onPartial, onFinal, {
+    onStateChange: (state, detail) => {
+      if (state === 'reconnecting' || state === 'gave_up') {
+        runtime.store.append(EventType.TRANSCRIPTION_FAILED, { error: `relay ${state}: ${detail}` });
+      }
+      service.broadcast(runtime, { type: 'relay.state', state, detail });
+    },
+  });
+
+  const done = relaySupervisor.run().catch((err) => {
+    if (err instanceof RealtimeSessionError) {
+      runtime.store.append(EventType.TRANSCRIPTION_FAILED, { error: err.message });
+      try {
+        ws.send(
+          JSON.stringify({
+            type: 'processing.error',
+            detail: `Live transcription unavailable: ${err.message}`,
+          }),
+        );
+      } catch {
+        // client already gone
+      }
+      ws.close(4503);
+    } else {
+      console.error('relay failed:', err);
+      ws.close(1011);
+    }
+  });
+
   ws.on('message', (data, isBinary) => {
     if (isBinary) {
-      void relay.sendAudio(data as Buffer).catch((err) => console.error('relay send failed:', err));
+      void relaySupervisor
+        .sendAudio(data as Buffer)
+        .catch((err) => console.error('relay send failed:', err));
     } else {
       try {
         const control = JSON.parse(String(data));
@@ -496,8 +572,9 @@ async function handleAudioSocket(
     }
   });
   ws.on('close', () => {
-    void relay.close();
+    void relaySupervisor.stop();
   });
+  await done;
 }
 
 // ---------------------------------------------------------------------------

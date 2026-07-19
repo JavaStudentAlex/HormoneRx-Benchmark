@@ -58,6 +58,26 @@ export interface JsonSubscriber {
   send(data: string): void;
 }
 
+/**
+ * Structural hook the fleet supervisor implements. The service never depends
+ * on fleet internals; with no fleet attached the engine behaves exactly as
+ * before (this is what the fleet-parity tests assert).
+ */
+export interface FleetHook {
+  afterTurn(runtime: EncounterRuntime, turn: TranscriptTurn): Promise<void>;
+  afterCommit(runtime: EncounterRuntime, latestTurn: TranscriptTurn | null): Promise<void>;
+  clearEncounter(encounterId: string): void;
+}
+
+/** Supplementary extraction proposed by a fleet worker for an existing turn. */
+export interface FleetExtractionProposal {
+  turn_id: string;
+  normalized_mentions: unknown[];
+  corrections: unknown[];
+  missing_information: string[];
+  note: string;
+}
+
 export class EncounterRuntime {
   store: EncounterEventStore;
   lock = new Mutex();
@@ -84,6 +104,8 @@ export class EncounterService {
   validator: GraphValidator;
   warningEngine: WarningEngine;
   encounters = new Map<string, EncounterRuntime>();
+  /** Attached by FleetSupervisor.attach(); null means no fleet (baseline engine). */
+  fleet: FleetHook | null = null;
 
   constructor(
     public settings: Settings,
@@ -133,6 +155,7 @@ export class EncounterService {
       runtime.store.append(EventType.SESSION_RESET, {});
       runtime.warnings = [];
       runtime.latencies = [];
+      this.fleet?.clearEncounter(runtime.encounter_id);
       await this.recompute(runtime, null);
     });
   }
@@ -256,8 +279,55 @@ export class EncounterService {
         { speaker: args.speaker },
       );
 
-      return this.recompute(runtime, turn, [t0, t1]);
+      const snapshot = await this.recompute(runtime, turn, [t0, t1]);
+      if (this.fleet && snapshot.result_state !== ResultState.PROCESSING_ERROR) {
+        await this.fleet.afterTurn(runtime, turn);
+      }
+      return runtime.snapshot;
     });
+  }
+
+  /**
+   * Merge a fleet worker's supplementary extraction into the turn's
+   * MENTIONS_EXTRACTED event (union with the primary extraction) and
+   * recompute. The reducer keys extractions by turn, last event wins, so the
+   * merged event carries the primary mentions plus the worker's additions —
+   * nothing is replaced, and the reducer applies its ordinary rules to decide
+   * what the graph looks like. Returns false when the turn has no extraction
+   * event to merge into. Caller must hold the encounter lock.
+   */
+  async applyFleetExtraction(
+    runtime: EncounterRuntime,
+    proposal: FleetExtractionProposal,
+  ): Promise<boolean> {
+    const existing = [...runtime.store.events]
+      .reverse()
+      .find(
+        (e) =>
+          e.event_type === EventType.MENTIONS_EXTRACTED && e.payload.turn_id === proposal.turn_id,
+      );
+    if (!existing) return false;
+    const merged = {
+      turn_id: proposal.turn_id,
+      extraction_method: `${existing.payload.extraction_method}+${proposal.note.split(':')[0]}`,
+      extraction_model: existing.payload.extraction_model,
+      normalized_mentions: [
+        ...((existing.payload.normalized_mentions as unknown[]) ?? []),
+        ...proposal.normalized_mentions,
+      ],
+      corrections: [
+        ...((existing.payload.corrections as unknown[]) ?? []),
+        ...proposal.corrections,
+      ],
+      missing_information: [
+        ...((existing.payload.missing_information as string[]) ?? []),
+        ...proposal.missing_information,
+      ],
+      fleet_note: proposal.note,
+    };
+    runtime.store.append(EventType.MENTIONS_EXTRACTED, merged, { speaker: existing.speaker });
+    await this.recompute(runtime, null);
+    return true;
   }
 
   // -- proposals -----------------------------------------------------------
@@ -284,7 +354,9 @@ export class EncounterService {
         cancelled_at: null,
       };
       runtime.store.append(EventType.PRESCRIPTION_PROPOSED, { proposal }, { eventId: args.event_id });
-      return this.recompute(runtime, null);
+      await this.recompute(runtime, null);
+      await this.fleet?.afterCommit(runtime, null);
+      return runtime.snapshot;
     });
   }
 
@@ -301,7 +373,9 @@ export class EncounterService {
         { proposal_id: args.proposal_id },
         { eventId: args.event_id },
       );
-      return this.recompute(runtime, null);
+      await this.recompute(runtime, null);
+      await this.fleet?.afterCommit(runtime, null);
+      return runtime.snapshot;
     });
   }
 

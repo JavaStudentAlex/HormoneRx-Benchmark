@@ -15,7 +15,9 @@ let baseUrl: string;
 let wsBase: string;
 
 beforeAll(async () => {
-  backend = createBackend(defaultSettings());
+  // Fleet disabled here: this suite pins the BASELINE wire contract (exact
+  // message sequences). Fleet API/WS behavior is covered in fleet.test.ts.
+  backend = createBackend(defaultSettings({ fleet_enabled: false }));
   await new Promise<void>((resolve) => backend.server.listen(0, resolve));
   const port = (backend.server.address() as AddressInfo).port;
   baseUrl = `http://127.0.0.1:${port}`;
