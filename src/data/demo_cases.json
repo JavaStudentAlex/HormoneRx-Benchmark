@@ -1,0 +1,66 @@
+{
+  "demoVersion": "0.1.0",
+  "note": "Deterministic cached extraction for demo mode. Synthetic consultation snippets only; no real patient data.",
+  "cases": [
+    {
+      "id": "DEMO-01",
+      "label": "Positive evidence match",
+      "text": "The patient currently takes a combined oral contraceptive and carbamazepine.",
+      "cachedExtraction": {
+        "hormonalProduct": { "raw": "combined oral contraceptive", "normalized": "Combined hormonal contraceptive", "status": "current", "sourceSpan": "combined oral contraceptive" },
+        "otherMedication": { "raw": "carbamazepine", "normalized": "Carbamazepine", "status": "current", "sourceSpan": "carbamazepine" },
+        "missingInformation": [],
+        "shouldSearchEvidence": true,
+        "reason": "Both a hormonal product and an interacting medication are stated as current with no negation or historical marker."
+      }
+    },
+    {
+      "id": "DEMO-02",
+      "label": "Explicit negation",
+      "text": "She uses a combined oral contraceptive but is not taking carbamazepine.",
+      "cachedExtraction": {
+        "hormonalProduct": { "raw": "combined oral contraceptive", "normalized": "Combined hormonal contraceptive", "status": "current", "sourceSpan": "combined oral contraceptive" },
+        "otherMedication": { "raw": "carbamazepine", "normalized": "Carbamazepine", "status": "negated", "sourceSpan": "is not taking carbamazepine" },
+        "missingInformation": [],
+        "shouldSearchEvidence": false,
+        "reason": "The interacting medication is explicitly negated, so it is excluded from evidence retrieval."
+      }
+    },
+    {
+      "id": "DEMO-03",
+      "label": "Historical medication",
+      "text": "She stopped carbamazepine last year and currently uses a combined oral contraceptive.",
+      "cachedExtraction": {
+        "hormonalProduct": { "raw": "combined oral contraceptive", "normalized": "Combined hormonal contraceptive", "status": "current", "sourceSpan": "combined oral contraceptive" },
+        "otherMedication": { "raw": "carbamazepine", "normalized": "Carbamazepine", "status": "historical", "sourceSpan": "stopped carbamazepine last year" },
+        "missingInformation": [],
+        "shouldSearchEvidence": false,
+        "reason": "The interacting medication is described as stopped in the past, so it is excluded from evidence retrieval."
+      }
+    },
+    {
+      "id": "DEMO-04",
+      "label": "No validated match",
+      "text": "She uses a combined oral contraceptive and takes paracetamol occasionally.",
+      "cachedExtraction": {
+        "hormonalProduct": { "raw": "combined oral contraceptive", "normalized": "Combined hormonal contraceptive", "status": "current", "sourceSpan": "combined oral contraceptive" },
+        "otherMedication": { "raw": "paracetamol", "normalized": "Paracetamol", "status": "current", "sourceSpan": "paracetamol occasionally" },
+        "missingInformation": [],
+        "shouldSearchEvidence": true,
+        "reason": "A hormonal product and a current medication are present; retrieval should run but no matching record is expected."
+      }
+    },
+    {
+      "id": "DEMO-05",
+      "label": "Incomplete hormonal context",
+      "text": "She takes carbamazepine and says she uses contraception, but the method is unclear.",
+      "cachedExtraction": {
+        "hormonalProduct": { "raw": "contraception (method unclear)", "normalized": null, "status": "uncertain", "sourceSpan": "uses contraception, but the method is unclear" },
+        "otherMedication": { "raw": "carbamazepine", "normalized": "Carbamazepine", "status": "current", "sourceSpan": "carbamazepine" },
+        "missingInformation": ["Specific hormonal contraceptive method is not stated."],
+        "shouldSearchEvidence": false,
+        "reason": "The hormonal method is not identifiable, so retrieval is withheld pending clarification."
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+node_modules
+dist
+dist_verify
+.env
+.env.local
+*.local
+.DS_Store
+screenshots/*.tmp
+vite.config.ts.timestamp-*.mjs
+
+# Internal planning notes — kept local, NOT published to the public repo.
+# Delete these three lines if you want them included.
+outputs/
+memory.md
+project-brief.md
+
+# Stray local zip export of this project (not part of the source tree)
+zihvsfRw
