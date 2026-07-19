@@ -42,6 +42,31 @@ services:
         value: "false"
       - key: LOG_LEVEL
         value: INFO
+      # ---- Explicit mirrors of the code defaults (backend/src/config.ts) so
+      # the deployed config is fully visible here, not implied by fallbacks.
+      - key: OPENAI_BASE_URL
+        value: https://api.openai.com/v1
+      - key: TRANSCRIPTION_MODEL
+        value: gpt-realtime-whisper
+      - key: TRANSCRIPTION_LANGUAGE
+        value: en
+      - key: EXTRACTION_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_TTS_MODEL
+        value: tts-1
+      - key: SPEAKER_ATTRIBUTION_ENABLED
+        value: "true"
+      - key: SPEAKER_ATTRIBUTION_CONTEXT_TURNS
+        value: "6"
+      - key: SPEAKER_ATTRIBUTION_TIMEOUT_MS
+        value: "8000"
+      - key: FLEET_LINK_INTERVAL_MIN
+        value: "360"
+      - key: FLEET_WATCHDOG_INTERVAL_S
+        value: "60"
+      # Must stay true on Render — the backend serves the built frontend.
+      - key: SERVE_STATIC
+        value: "true"
       # ---- Secrets — values are NOT stored here. `sync: false` means Render
       # prompts for them at blueprint deploy (or set them in the service's
       # Environment tab). Never commit real keys to this file.
